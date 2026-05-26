@@ -16,10 +16,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function adminDurumKontrol() {
   try {
-    const r = await fetch('/api/admin/durum');
+    const r = await fetch('/api/admin/durum', { credentials: 'include' });
     const d = await r.json();
     if (!d.girisYapildi) window.location.href = '/admin-giris';
   } catch (e) {
+    console.error('Admin durum kontrol hatası:', e);
     window.location.href = '/admin-giris';
   }
 }

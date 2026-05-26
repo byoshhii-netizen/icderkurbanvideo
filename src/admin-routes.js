@@ -43,7 +43,7 @@ router.post('/sifre-degistir', adminKontrol, ac(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// ─── LOGO ─────────────────────────────────────────────────────────────────────
+// ─── LOGO — public (giriş sayfasında da gösterilir) ──────────────────────────
 router.get('/logo', ac(async (req, res) => {
   const db = await getDb();
   const site  = db.prepare("SELECT deger FROM sistem_ayarlari WHERE anahtar='site_logo_b64'").get();

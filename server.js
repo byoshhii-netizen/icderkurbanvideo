@@ -31,11 +31,14 @@ app.use(session({
   cookie: {
     maxAge: 24 * 60 * 60 * 1000,
     httpOnly: true,
-    // Railway HTTPS üzerinden çalışır
-    secure: process.env.NODE_ENV === 'production',
+    // Railway'de proxy arkasında çalışır, secure sadece gerçekten HTTPS varsa aktif
+    secure: false,
     sameSite: 'lax',
   }
 }));
+
+// Railway proxy arkasında çalışırken gerçek IP ve HTTPS için
+app.set('trust proxy', 1);
 
 // ─── HEALTHCHECK — Railway bunu kullanır ─────────────────────────────────────
 app.get('/health', (req, res) => {
@@ -48,18 +51,31 @@ app.use('/api/medya', require('./src/cloudinary'));
 app.use('/api', require('./src/routes'));
 
 // ─── SAYFALAR ─────────────────────────────────────────────────────────────────
-app.get('/admin-giris', (req, res) =>
-  res.sendFile(path.join(__dirname, 'public', 'admin-giris.html')));
+app.get('/admin-giris', (req, res) => {
+  // Eski session varsa temizle
+  req.session.destroy(() => {});
+  res.sendFile(path.join(__dirname, 'public', 'admin-giris.html'));
+});
 
 app.get('/admin', (req, res) => {
+  console.log('[ADMIN] Session adminGiris:', req.session.adminGiris, '| SessionID:', req.sessionID);
   if (!req.session.adminGiris) return res.redirect('/admin-giris');
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
+// Ana sayfa + arama route'u (SPA — hepsi index.html'e gider, JS URL'i okur)
 app.get('/', (req, res) =>
   res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// SPA fallback
+// /ara?q=ismail  →  arama sonuçları sayfası
+app.get('/ara', (req, res) =>
+  res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+// /video/:id  →  tek video sayfası (direkt link paylaşılabilir)
+app.get('/video/:id', (req, res) =>
+  res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+// SPA fallback — diğer tüm path'ler
 app.get('*', (req, res) =>
   res.sendFile(path.join(__dirname, 'public', 'index.html')));
 

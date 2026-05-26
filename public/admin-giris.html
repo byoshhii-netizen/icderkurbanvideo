@@ -72,7 +72,8 @@
 
   async function girisYap(e) {
     e.preventDefault();
-    const sifre = document.getElementById('sifreInput').value;
+    const sifre = document.getElementById('sifreInput').value.trim();
+    if (!sifre) return;
     const btn = document.getElementById('loginBtn');
     const err = document.getElementById('loginError');
     err.style.display = 'none';
@@ -82,19 +83,24 @@
       const r = await fetch('/api/admin/giris', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ sifre })
       });
       const d = await r.json();
       if (d.ok) {
+        btn.innerHTML = '<i class="fas fa-check"></i> Yönlendiriliyor...';
+        // Session cookie'nin set edilmesi için bekle
+        await new Promise(res => setTimeout(res, 200));
         window.location.href = '/admin';
       } else {
         err.textContent = d.hata || 'Şifre yanlış';
         err.style.display = 'block';
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Giriş Yap';
+        document.getElementById('sifreInput').select();
       }
     } catch (ex) {
-      err.textContent = 'Bağlantı hatası';
+      err.textContent = 'Bağlantı hatası: ' + ex.message;
       err.style.display = 'block';
       btn.disabled = false;
       btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Giriş Yap';
