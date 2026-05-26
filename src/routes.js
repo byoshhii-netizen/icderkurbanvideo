@@ -1,6 +1,9 @@
 const router = require('express').Router();
 const { getDb } = require('./database');
 
+// ─── ASYNC HATA SARMALAYICI ───────────────────────────────────────────────────
+const ac = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
 // ─── YARDIMCI: Türkçe karakter normalize ─────────────────────────────────────
 function normalizeTR(str) {
   if (!str) return '';
@@ -62,146 +65,106 @@ function fuzzyScore(query, target) {
 }
 
 // ─── AKTİF ORGANİZASYON ──────────────────────────────────────────────────────
-router.get('/aktif-organizasyon', async (req, res) => {
-  try {
-    const db = await getDb();
-    const ayar = db.prepare("SELECT deger FROM sistem_ayarlari WHERE anahtar='aktif_organizasyon_id'").get();
-    const orgId = ayar?.deger;
-    if (!orgId) return res.json({ organizasyon: null });
-    const org = db.prepare('SELECT * FROM organizasyonlar WHERE id=?').get(orgId);
-    res.json({ organizasyon: org || null });
-  } catch (e) {
-    res.status(500).json({ hata: e.message });
-  }
-});
+router.get('/aktif-organizasyon', ac(async (req, res) => {
+  const db = await getDb();
+  const ayar = db.prepare("SELECT deger FROM sistem_ayarlari WHERE anahtar='aktif_organizasyon_id'").get();
+  const orgId = ayar?.deger;
+  if (!orgId) return res.json({ organizasyon: null });
+  const org = db.prepare('SELECT * FROM organizasyonlar WHERE id=?').get(orgId);
+  res.json({ organizasyon: org || null });
+}));
 
 // ─── ORGANİZASYONLAR LİSTESİ (public) ───────────────────────────────────────
-router.get('/organizasyonlar', async (req, res) => {
-  try {
-    const db = await getDb();
-    const orgs = db.prepare('SELECT * FROM organizasyonlar WHERE aktif=1 ORDER BY yil DESC, id DESC').all();
-    res.json(orgs);
-  } catch (e) {
-    res.status(500).json({ hata: e.message });
-  }
-});
+router.get('/organizasyonlar', ac(async (req, res) => {
+  const db = await getDb();
+  const orgs = db.prepare('SELECT * FROM organizasyonlar WHERE aktif=1 ORDER BY yil DESC, id DESC').all();
+  res.json(orgs);
+}));
 
 // ─── VİDEO ARAMA (ana işlev) ─────────────────────────────────────────────────
-router.get('/ara', async (req, res) => {
+router.get('/ara', ac(async (req, res) => {
   const { q, org_id } = req.query;
   if (!q || q.trim().length < 1) return res.json({ sonuclar: [] });
 
-  try {
-    const db = await getDb();
-    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
-    const ua = req.headers['user-agent'] || '';
+  const db = await getDb();
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+  const ua = req.headers['user-agent'] || '';
 
-    // Aktif organizasyon filtresi
-    let orgFilter = '';
-    let orgParams = [];
-    if (org_id) {
+  let orgFilter = '';
+  let orgParams = [];
+  if (org_id) {
+    orgFilter = ' AND v.organizasyon_id = ?';
+    orgParams = [org_id];
+  } else {
+    const ayar = db.prepare("SELECT deger FROM sistem_ayarlari WHERE anahtar='aktif_organizasyon_id'").get();
+    if (ayar?.deger) {
       orgFilter = ' AND v.organizasyon_id = ?';
-      orgParams = [org_id];
-    } else {
-      // Aktif organizasyonu al
-      const ayar = db.prepare("SELECT deger FROM sistem_ayarlari WHERE anahtar='aktif_organizasyon_id'").get();
-      if (ayar?.deger) {
-        orgFilter = ' AND v.organizasyon_id = ?';
-        orgParams = [ayar.deger];
-      }
+      orgParams = [ayar.deger];
     }
-
-    // Tüm videoları bağışçı bilgileriyle çek
-    const videolar = db.prepare(`
-      SELECT v.*, b.ad as bagisci_adi, b.telefon as bagisci_telefon,
-             o.ad as organizasyon_adi
-      FROM videolar v
-      JOIN bagiscilar b ON v.bagisci_id = b.id
-      JOIN organizasyonlar o ON v.organizasyon_id = o.id
-      WHERE 1=1 ${orgFilter}
-      ORDER BY v.olusturma DESC
-    `).all(...orgParams);
-
-    const query = q.trim();
-
-    // Her video için skor hesapla
-    const skorlu = videolar.map(v => {
-      const alanlar = [
-        v.bagisci_adi,
-        v.baslik,
-        v.arama_etiketleri,
-        v.bagisci_telefon,
-      ];
-      const maxSkor = Math.max(...alanlar.map(a => fuzzyScore(query, a)));
-      return { ...v, _skor: maxSkor };
-    }).filter(v => v._skor >= 30);
-
-    // Skora göre sırala
-    skorlu.sort((a, b) => b._skor - a._skor);
-
-    // İzleme logu kaydet (arama yapıldığında)
-    try {
-      db.prepare(`
-        INSERT INTO izleme_loglari (video_id, bagisci_id, aranan_isim, ip_adresi, user_agent)
-        VALUES (NULL, NULL, ?, ?, ?)
-      `).run(query, ip, ua);
-    } catch (e) {}
-
-    res.json({ sonuclar: skorlu.slice(0, 50) });
-  } catch (e) {
-    res.status(500).json({ hata: e.message });
   }
-});
+
+  const videolar = db.prepare(`
+    SELECT v.*, b.ad as bagisci_adi, b.telefon as bagisci_telefon,
+           o.ad as organizasyon_adi
+    FROM videolar v
+    JOIN bagiscilar b ON v.bagisci_id = b.id
+    JOIN organizasyonlar o ON v.organizasyon_id = o.id
+    WHERE 1=1 ${orgFilter}
+    ORDER BY v.olusturma DESC
+  `).all(...orgParams);
+
+  const query = q.trim();
+  const skorlu = videolar.map(v => {
+    const alanlar = [v.bagisci_adi, v.baslik, v.arama_etiketleri, v.bagisci_telefon];
+    const maxSkor = Math.max(...alanlar.map(a => fuzzyScore(query, a)));
+    return { ...v, _skor: maxSkor };
+  }).filter(v => v._skor >= 30);
+  skorlu.sort((a, b) => b._skor - a._skor);
+
+  // Arama logu — hata olsa bile sonuç dön
+  try {
+    db.prepare('INSERT INTO izleme_loglari (video_id, bagisci_id, aranan_isim, ip_adresi, user_agent) VALUES (NULL, NULL, ?, ?, ?)')
+      .run(query, ip, ua);
+  } catch (_) {}
+
+  res.json({ sonuclar: skorlu.slice(0, 50) });
+}));
 
 // ─── VİDEO İZLEME LOGU ───────────────────────────────────────────────────────
-router.post('/izleme-log', async (req, res) => {
+router.post('/izleme-log', ac(async (req, res) => {
   const { video_id, bagisci_id, aranan_isim } = req.body;
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
   const ua = req.headers['user-agent'] || '';
+  const db = await getDb();
   try {
-    const db = await getDb();
-    db.prepare(`
-      INSERT INTO izleme_loglari (video_id, bagisci_id, aranan_isim, ip_adresi, user_agent)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(video_id || null, bagisci_id || null, aranan_isim || null, ip, ua);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ hata: e.message });
-  }
-});
+    db.prepare('INSERT INTO izleme_loglari (video_id, bagisci_id, aranan_isim, ip_adresi, user_agent) VALUES (?, ?, ?, ?, ?)')
+      .run(video_id || null, bagisci_id || null, aranan_isim || null, ip, ua);
+  } catch (_) {}
+  res.json({ ok: true });
+}));
 
-// ─── SİTE AYARLARI (logo vb.) ─────────────────────────────────────────────────
-router.get('/ayarlar', async (req, res) => {
-  try {
-    const db = await getDb();
-    const rows = db.prepare("SELECT anahtar, deger FROM sistem_ayarlari WHERE anahtar IN ('site_logo_b64','site_basligi','sifre_sistemi_aktif')").all();
-    const ayarlar = {};
-    rows.forEach(r => { ayarlar[r.anahtar] = r.deger; });
-    res.json(ayarlar);
-  } catch (e) {
-    res.status(500).json({ hata: e.message });
-  }
-});
+// ─── SİTE AYARLARI ────────────────────────────────────────────────────────────
+router.get('/ayarlar', ac(async (req, res) => {
+  const db = await getDb();
+  const rows = db.prepare("SELECT anahtar, deger FROM sistem_ayarlari WHERE anahtar IN ('site_logo_b64','site_basligi','sifre_sistemi_aktif')").all();
+  const ayarlar = {};
+  rows.forEach(r => { ayarlar[r.anahtar] = r.deger; });
+  res.json(ayarlar);
+}));
 
-// ─── ŞİFRE KONTROLÜ (numaralı şifre sistemi) ─────────────────────────────────
-router.post('/sifre-kontrol', async (req, res) => {
-  try {
-    const db = await getDb();
-    const aktifRow = db.prepare("SELECT deger FROM sistem_ayarlari WHERE anahtar='sifre_sistemi_aktif'").get();
-    if (aktifRow?.deger !== '1') {
-      return res.json({ ok: true, mesaj: 'Şifre sistemi kapalı' });
-    }
-    // Şifre sistemi aktifse telefon numarasıyla doğrula
-    const { telefon } = req.body;
-    if (!telefon) return res.status(400).json({ hata: 'Telefon numarası gerekli' });
-    const temizTelefon = telefon.replace(/\D/g, '').replace(/^0/, '').replace(/^90/, '');
-    const bagisci = db.prepare("SELECT id FROM bagiscilar WHERE REPLACE(REPLACE(telefon, '+90', ''), '0', '') LIKE ?").get('%' + temizTelefon + '%');
-    if (!bagisci) return res.status(401).json({ hata: 'Bu numaraya ait kayıt bulunamadı' });
-    req.session.dogrulanmisTelefon = temizTelefon;
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ hata: e.message });
-  }
-});
+// ─── ŞİFRE KONTROLÜ ──────────────────────────────────────────────────────────
+router.post('/sifre-kontrol', ac(async (req, res) => {
+  const db = await getDb();
+  const aktifRow = db.prepare("SELECT deger FROM sistem_ayarlari WHERE anahtar='sifre_sistemi_aktif'").get();
+  if (aktifRow?.deger !== '1') return res.json({ ok: true, mesaj: 'Şifre sistemi kapalı' });
+  const { telefon } = req.body;
+  if (!telefon) return res.status(400).json({ hata: 'Telefon numarası gerekli' });
+  const temizTelefon = telefon.replace(/\D/g, '').replace(/^0/, '').replace(/^90/, '');
+  const bagisci = db.prepare("SELECT id FROM bagiscilar WHERE REPLACE(REPLACE(telefon, '+90', ''), '0', '') LIKE ?")
+    .get('%' + temizTelefon + '%');
+  if (!bagisci) return res.status(401).json({ hata: 'Bu numaraya ait kayıt bulunamadı' });
+  req.session.dogrulanmisTelefon = temizTelefon;
+  res.json({ ok: true });
+}));
 
 module.exports = router;
