@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>İÇDER Kurban Videoları</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/fa/css/all.min.css">
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-logo">
+    <img id="siteLogo" src="" alt="Logo" style="display:none">
+    <div>
+      <span class="header-logo-text" id="siteBaslik">İÇDER Kurban Videoları</span>
+      <span class="header-logo-sub">Kurban kesim videolarınızı izleyin</span>
+    </div>
+  </div>
+</header>
+
+<!-- HERO / ARAMA -->
+<section class="hero">
+  <h1>Kurban Videonuzu Bulun</h1>
+  <p>Adınızı yazın, kurban kesim videonuzu izleyin</p>
+
+  <div class="org-selector" id="orgSelectorWrap" style="display:none">
+    <select id="orgSelect" onchange="aramaYap()">
+      <option value="">Tüm organizasyonlar</option>
+    </select>
+  </div>
+
+  <div class="search-box">
+    <input
+      type="text"
+      class="search-input"
+      id="searchInput"
+      placeholder="Adınızı yazın... (örn: Ahmet Yılmaz)"
+      autocomplete="off"
+      autocorrect="off"
+      spellcheck="false"
+    >
+    <button class="search-btn" onclick="aramaYap()" title="Ara">
+      <i class="fas fa-search"></i>
+    </button>
+  </div>
+  <p class="search-hint">
+    <i class="fas fa-info-circle"></i>
+    Büyük/küçük harf fark etmez. Yanlış yazılsa bile benzer isimler gösterilir.
+  </p>
+</section>
+
+<!-- SONUÇLAR -->
+<section class="results-section" id="resultsSection" style="display:none">
+  <div class="results-header">
+    <div class="results-count" id="resultsCount"></div>
+  </div>
+  <div class="video-grid" id="videoGrid"></div>
+</section>
+
+<!-- BOŞ DURUM -->
+<div id="emptyState" style="display:none">
+  <div class="empty-state">
+    <i class="fas fa-video-slash"></i>
+    <h3 id="emptyTitle">Sonuç bulunamadı</h3>
+    <p id="emptyDesc">Farklı bir isim deneyin veya organizasyon seçin</p>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loadingState" style="display:none">
+  <div class="loading-spinner">
+    <div class="spinner"></div>
+    <span>Aranıyor...</span>
+  </div>
+</div>
+
+<!-- VİDEO MODAL -->
+<div class="modal-overlay hidden" id="videoModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Video</div>
+      <button class="modal-close" onclick="modalKapat()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-video-wrap">
+      <video id="modalVideo" controls playsinline preload="metadata">
+        Tarayıcınız video oynatmayı desteklemiyor.
+      </video>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <span class="badge badge-green" id="modalOwner"></span>
+        <span class="badge badge-gray" id="modalOrg"></span>
+        <span class="video-no-badge" id="modalVideoNo"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — İÇDER Kurban Videoları</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/fa/css/all.min.css">
+</head>
+<body>
+
+<div class="admin-layout">
+
+  <!-- SIDEBAR OVERLAY (mobile) -->
+  <div class="admin-sidebar-overlay" id="sidebarOverlay" onclick="sidebarKapat()"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="admin-sidebar" id="adminSidebar">
+    <div class="admin-sidebar-logo">
+      <img id="adminLogoImg" src="" alt="Logo" style="display:none; height:36px;">
+      <div class="admin-sidebar-logo-text">
+        İÇDER<br>
+        <span style="font-weight:400; font-size:0.75rem; color:var(--text3);">Kurban Videoları</span>
+      </div>
+    </div>
+    <nav class="admin-nav">
+      <button class="admin-nav-item active" onclick="sayfaGit('dashboard')" id="nav-dashboard">
+        <i class="fas fa-chart-bar"></i> Dashboard
+      </button>
+      <button class="admin-nav-item" onclick="sayfaGit('organizasyonlar')" id="nav-organizasyonlar">
+        <i class="fas fa-sitemap"></i> Organizasyonlar
+      </button>
+      <button class="admin-nav-item" onclick="sayfaGit('bagiscilar')" id="nav-bagiscilar">
+        <i class="fas fa-users"></i> Bağışçılar
+      </button>
+      <button class="admin-nav-item" onclick="sayfaGit('videolar')" id="nav-videolar">
+        <i class="fas fa-video"></i> Kurban Videoları
+      </button>
+      <button class="admin-nav-item" onclick="sayfaGit('izleme')" id="nav-izleme">
+        <i class="fas fa-eye"></i> İzleme Logları
+      </button>
+      <button class="admin-nav-item" onclick="sayfaGit('ayarlar')" id="nav-ayarlar">
+        <i class="fas fa-cog"></i> Ayarlar
+      </button>
+    </nav>
+    <div style="padding:12px 8px; border-top:1px solid var(--border);">
+      <button class="admin-nav-item" onclick="cikisYap()" style="color:var(--red);">
+        <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+      </button>
+      <a href="/" target="_blank" class="admin-nav-item" style="display:flex; text-decoration:none; color:var(--text3);">
+        <i class="fas fa-external-link-alt"></i> Siteyi Görüntüle
+      </a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <button class="mobile-menu-btn" onclick="sidebarAc()"><i class="fas fa-bars"></i></button>
+        <span class="admin-topbar-title" id="topbarTitle">Dashboard</span>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <!-- DASHBOARD -->
+      <div id="page-dashboard">
+        <div class="stats-grid" id="statsGrid"></div>
+        <div class="panel-section">
+          <div class="panel-section-title"><i class="fas fa-history"></i> Son Aramalar</div>
+          <div id="sonAramalarList"></div>
+        </div>
+      </div>
+
+      <!-- ORGANİZASYONLAR -->
+      <div id="page-organizasyonlar" style="display:none">
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <span class="table-toolbar-title"><i class="fas fa-sitemap" style="color:var(--accent)"></i> Organizasyonlar</span>
+            <button class="btn btn-primary btn-sm" onclick="orgEkleModal()">
+              <i class="fas fa-plus"></i> Yeni Organizasyon
+            </button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Organizasyon Adı</th>
+                <th>Yıl</th>
+                <th>Bağışçı</th>
+                <th>Video</th>
+                <th>Durum</th>
+                <th>Aktif Org</th>
+                <th>İşlem</th>
+              </tr>
+            </thead>
+            <tbody id="orgTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- BAĞIŞÇILAR -->
+      <div id="page-bagiscilar" style="display:none">
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <span class="table-toolbar-title"><i class="fas fa-users" style="color:var(--accent)"></i> Bağışçılar</span>
+            <select class="form-select" id="bagisciOrgFilter" onchange="bagiscilarYukle()" style="width:auto; padding:6px 10px;">
+              <option value="">Tüm organizasyonlar</option>
+            </select>
+            <select class="form-select" id="bagisciVideoDurum" onchange="bagiscilarYukle()" style="width:auto; padding:6px 10px;">
+              <option value="">Tüm durumlar</option>
+              <option value="var">Video var ✅</option>
+              <option value="yok">Video yok ❌</option>
+            </select>
+            <input type="text" class="form-input" id="bagisciArama" placeholder="İsim veya telefon ara..." style="width:200px; padding:6px 10px;" oninput="bagisciAramaDebounce()">
+            <button class="btn btn-primary btn-sm" onclick="bagisciEkleModal()">
+              <i class="fas fa-user-plus"></i> Bağışçı Ekle
+            </button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Durum</th>
+                <th>Ad Soyad</th>
+                <th>Telefon</th>
+                <th>Organizasyon</th>
+                <th>Video Sayısı</th>
+                <th>İşlem</th>
+              </tr>
+            </thead>
+            <tbody id="bagisciTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- VİDEOLAR -->
+      <div id="page-videolar" style="display:none">
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <span class="table-toolbar-title"><i class="fas fa-video" style="color:var(--accent)"></i> Kurban Videoları</span>
+            <select class="form-select" id="videoOrgFilter" onchange="videolarYukle()" style="width:auto; padding:6px 10px;">
+              <option value="">Tüm organizasyonlar</option>
+            </select>
+            <input type="text" class="form-input" id="videoArama" placeholder="Bağışçı veya başlık ara..." style="width:200px; padding:6px 10px;" oninput="videoAramaDebounce()">
+            <button class="btn btn-primary btn-sm" onclick="videoEkleModal()">
+              <i class="fas fa-plus"></i> Video Ekle
+            </button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Thumbnail</th>
+                <th>Bağışçı</th>
+                <th>Organizasyon</th>
+                <th>Başlık / Etiketler</th>
+                <th>Video No</th>
+                <th>Tarih</th>
+                <th>İşlem</th>
+              </tr>
+            </thead>
+            <tbody id="videoTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- İZLEME LOGLARI -->
+      <div id="page-izleme" style="display:none">
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <span class="table-toolbar-title"><i class="fas fa-eye" style="color:var(--accent)"></i> İzleme Logları</span>
+            <button class="btn btn-ghost btn-sm" onclick="izlemeLoglariniYukle()">
+              <i class="fas fa-sync"></i> Yenile
+            </button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Tarih</th>
+                <th>Aranan İsim</th>
+                <th>Video / Bağışçı</th>
+                <th>IP Adresi</th>
+                <th>Tür</th>
+              </tr>
+            </thead>
+            <tbody id="izlemeTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- AYARLAR -->
+      <div id="page-ayarlar" style="display:none">
+        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:20px;">
+
+          <!-- Logo Ayarları -->
+          <div class="panel-section">
+            <div class="panel-section-title"><i class="fas fa-image"></i> Logo Ayarları</div>
+            <div class="form-group">
+              <label class="form-label">Site Logosu</label>
+              <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+                <img id="siteLogoPreview" src="" alt="" style="height:48px; display:none; border-radius:6px; border:1px solid var(--border);">
+                <span id="siteLogoYok" style="color:var(--text3); font-size:0.85rem;">Logo yüklenmemiş</span>
+              </div>
+              <input type="file" id="siteLogoInput" accept="image/*" style="display:none" onchange="logoYukle('site', this)">
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('siteLogoInput').click()">
+                  <i class="fas fa-upload"></i> Logo Seç
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="logoSil('site')">
+                  <i class="fas fa-trash"></i> Sil
+                </button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Admin Panel Logosu</label>
+              <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+                <img id="adminLogoPreview" src="" alt="" style="height:48px; display:none; border-radius:6px; border:1px solid var(--border);">
+                <span id="adminLogoYok" style="color:var(--text3); font-size:0.85rem;">Logo yüklenmemiş</span>
+              </div>
+              <input type="file" id="adminLogoInput" accept="image/*" style="display:none" onchange="logoYukle('admin', this)">
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('adminLogoInput').click()">
+                  <i class="fas fa-upload"></i> Logo Seç
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="logoSil('admin')">
+                  <i class="fas fa-trash"></i> Sil
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Site Başlığı -->
+          <div class="panel-section">
+            <div class="panel-section-title"><i class="fas fa-heading"></i> Site Başlığı</div>
+            <div class="form-group">
+              <label class="form-label">Başlık</label>
+              <input type="text" class="form-input" id="siteBaslikInput" placeholder="İÇDER Kurban Videoları">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="siteBasligiKaydet()">
+              <i class="fas fa-save"></i> Kaydet
+            </button>
+          </div>
+
+          <!-- Şifre Sistemi -->
+          <div class="panel-section">
+            <div class="panel-section-title"><i class="fas fa-lock"></i> Numaralı Şifre Sistemi</div>
+            <p style="font-size:0.85rem; color:var(--text3); margin-bottom:16px;">
+              Aktif edilirse ziyaretçiler telefon numarasıyla doğrulama yaparak videoları izleyebilir.
+            </p>
+            <div class="toggle-wrap">
+              <label class="toggle">
+                <input type="checkbox" id="sifreSistemiToggle" onchange="sifreSistemiGuncelle(this.checked)">
+                <span class="toggle-slider"></span>
+              </label>
+              <span id="sifreSistemiDurum" style="font-size:0.9rem; color:var(--text2);">Kapalı</span>
+            </div>
+          </div>
+
+          <!-- İÇDER'den Aktar -->
+          <div class="panel-section">
+            <div class="panel-section-title"><i class="fas fa-file-import"></i> İÇDER Kurban'dan Bağışçı Aktar</div>
+            <p style="font-size:0.85rem; color:var(--text3); margin-bottom:16px;">
+              İÇDER Kurban programındaki bağışçıları bu sisteme aktarır.
+            </p>
+            <div class="form-group">
+              <label class="form-label">Hedef Organizasyon</label>
+              <select class="form-select" id="aktarOrgInput">
+                <option value="">Organizasyon seçin</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="icderdenAktar()">
+              <i class="fas fa-file-import"></i> Aktar
+            </button>
+            <div id="aktarSonuc" style="margin-top:10px; font-size:0.85rem; color:var(--accent);"></div>
+          </div>
+
+          <!-- Admin Şifre Değiştir -->
+          <div class="panel-section">
+            <div class="panel-section-title"><i class="fas fa-key"></i> Admin Şifresini Değiştir</div>
+            <div class="form-group">
+              <label class="form-label">Mevcut Şifre</label>
+              <input type="password" class="form-input" id="mevcutSifre" placeholder="Mevcut şifre">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Yeni Şifre</label>
+              <input type="password" class="form-input" id="yeniSifre" placeholder="Yeni şifre">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="sifreDegistir()">
+              <i class="fas fa-save"></i> Şifreyi Değiştir
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL CONTAINER -->
+<div id="modalContainer"></div>
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/admin-app.js"></script>
+</body>
+</html>

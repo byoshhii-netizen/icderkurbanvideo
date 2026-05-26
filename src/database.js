@@ -1,0 +1,170 @@
+const initSqlJs = require('sql.js');
+const path = require('path');
+const fs = require('fs');
+
+function getDataDir() {
+  if (process.env.DATA_DIR) return process.env.DATA_DIR;
+  try {
+    if (fs.existsSync('/data')) {
+      fs.accessSync('/data', fs.constants.W_OK);
+      return '/data';
+    }
+  } catch (e) {}
+  return path.join(__dirname, '..', 'data');
+}
+
+const dataDir = getDataDir();
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+
+const DB_PATH = path.join(dataDir, 'kurban-video.db');
+
+let saveTimer = null;
+function scheduleSave(sqlDb) {
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try {
+      const data = sqlDb.export();
+      fs.writeFileSync(DB_PATH, Buffer.from(data));
+    } catch (e) {
+      console.error('[DB] Kayit hatasi:', e.message);
+    }
+  }, 1000);
+}
+
+class Statement {
+  constructor(sqlDb, sql) {
+    this._sqlDb = sqlDb;
+    this._sql = sql;
+  }
+  run(...params) {
+    this._sqlDb.run(this._sql, params.length ? params : []);
+    scheduleSave(this._sqlDb);
+    const rows = this._sqlDb.exec('SELECT last_insert_rowid() as id');
+    const lastId = rows.length > 0 ? rows[0].values[0][0] : 0;
+    return { changes: this._sqlDb.getRowsModified(), lastInsertRowid: lastId };
+  }
+  get(...params) {
+    const stmt = this._sqlDb.prepare(this._sql);
+    try {
+      stmt.bind(params.length ? params : []);
+      if (stmt.step()) return stmt.getAsObject();
+      return undefined;
+    } finally { stmt.free(); }
+  }
+  all(...params) {
+    const stmt = this._sqlDb.prepare(this._sql);
+    const results = [];
+    try {
+      stmt.bind(params.length ? params : []);
+      while (stmt.step()) results.push(stmt.getAsObject());
+    } finally { stmt.free(); }
+    return results;
+  }
+}
+
+class DbWrapper {
+  constructor(sqlDb) { this._sqlDb = sqlDb; }
+  prepare(sql) { return new Statement(this._sqlDb, sql); }
+  exec(sql) { this._sqlDb.run(sql); scheduleSave(this._sqlDb); }
+  pragma(str) { try { this._sqlDb.run(`PRAGMA ${str}`); } catch (e) {} }
+}
+
+const SCHEMA = `
+  CREATE TABLE IF NOT EXISTS organizasyonlar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ad TEXT NOT NULL,
+    yil INTEGER NOT NULL DEFAULT 2025,
+    aktif INTEGER DEFAULT 1,
+    olusturma DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS bagiscilar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    organizasyon_id INTEGER NOT NULL,
+    ad TEXT NOT NULL,
+    telefon TEXT,
+    video_var INTEGER DEFAULT 0,
+    olusturma DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS videolar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bagisci_id INTEGER NOT NULL,
+    organizasyon_id INTEGER NOT NULL,
+    baslik TEXT,
+    arama_etiketleri TEXT,
+    cloudinary_url TEXT NOT NULL,
+    cloudinary_public_id TEXT NOT NULL,
+    thumbnail_url TEXT,
+    video_no INTEGER DEFAULT 1,
+    sure INTEGER DEFAULT 0,
+    boyut INTEGER DEFAULT 0,
+    olusturma DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS izleme_loglari (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_id INTEGER,
+    bagisci_id INTEGER,
+    aranan_isim TEXT,
+    ip_adresi TEXT,
+    user_agent TEXT,
+    tarih DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS sistem_ayarlari (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    anahtar TEXT NOT NULL UNIQUE,
+    deger TEXT,
+    olusturma DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`;
+
+let _db = null;
+
+async function getDb() {
+  if (_db) return _db;
+  const SQL = await initSqlJs();
+  let sqlDb;
+  if (fs.existsSync(DB_PATH)) {
+    sqlDb = new SQL.Database(fs.readFileSync(DB_PATH));
+  } else {
+    sqlDb = new SQL.Database();
+  }
+  sqlDb.run('PRAGMA foreign_keys = ON');
+  SCHEMA.split(';').map(s => s.trim()).filter(Boolean).forEach(s => {
+    try { sqlDb.run(s); } catch (e) {}
+  });
+
+  // Migrations
+  const migrations = [
+    "ALTER TABLE bagiscilar ADD COLUMN video_var INTEGER DEFAULT 0",
+    "ALTER TABLE videolar ADD COLUMN thumbnail_url TEXT",
+    "ALTER TABLE videolar ADD COLUMN sure INTEGER DEFAULT 0",
+    "ALTER TABLE videolar ADD COLUMN boyut INTEGER DEFAULT 0",
+  ];
+  migrations.forEach(m => { try { sqlDb.run(m); } catch (e) {} });
+
+  // Varsayılan sistem ayarları
+  const defaults = [
+    ['admin_sifre', 'icder2025'],
+    ['site_logo_b64', ''],
+    ['admin_logo_b64', ''],
+    ['sifre_sistemi_aktif', '0'],
+    ['site_basligi', 'İÇDER Kurban Videoları'],
+    ['aktif_organizasyon_id', ''],
+  ];
+  defaults.forEach(([k, v]) => {
+    try {
+      sqlDb.run("INSERT OR IGNORE INTO sistem_ayarlari (anahtar, deger) VALUES (?, ?)", [k, v]);
+    } catch (e) {}
+  });
+
+  const data = sqlDb.export();
+  fs.writeFileSync(DB_PATH, Buffer.from(data));
+  _db = new DbWrapper(sqlDb);
+  return _db;
+}
+
+module.exports = { getDb };
