@@ -51,8 +51,8 @@ function sayfaGit(sayfa) {
   else if (sayfa === 'organizasyonlar') organizasyonTabloYukle();
   else if (sayfa === 'bagiscilar') bagiscilarYukle();
   else if (sayfa === 'videolar') videolarYukle();
-  else if (sayfa === 'izleme') izlemeLoglariniYukle();
-  else if (sayfa === 'ayarlar') { ayarlariYukle(); setTimeout(aktarOrgListesiDoldur, 200); }
+  else if (sayfa === 'izleme') { izlemeOrgFilterDoldur(); izlemeLoglariniYukle(); }
+  else if (sayfa === 'ayarlar') { ayarlariYukle(); setTimeout(topluVeAktarOrgDoldur, 200); }
 }
 
 // ─── SIDEBAR MOBILE ───────────────────────────────────────────────────────────
@@ -547,6 +547,7 @@ async function videolarYukle() {
         <td>
           <div style="display:flex; gap:6px;">
             <button class="btn btn-ghost btn-sm btn-icon" onclick="videoDuzenle(${v.id})" title="Düzenle"><i class="fas fa-edit"></i></button>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="videoLinkKopyala(${v.id})" title="Linki Kopyala"><i class="fas fa-link"></i></button>
             <a href="${escHtml(v.cloudinary_url)}" target="_blank" class="btn btn-ghost btn-sm btn-icon" title="İzle"><i class="fas fa-play"></i></a>
             <button class="btn btn-danger btn-sm btn-icon" onclick="videoSil(${v.id}, '${escHtml(v.cloudinary_public_id)}')" title="Sil"><i class="fas fa-trash"></i></button>
           </div>
@@ -822,12 +823,35 @@ async function videoSil(id, publicId) {
 }
 
 // ─── İZLEME LOGLARI ──────────────────────────────────────────────────────────
+function izlemeOrgFilterDoldur() {
+  ['izlemeOrgFilter'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Tüm organizasyonlar</option>';
+    organizasyonlar.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.id;
+      opt.textContent = `${o.ad} (${o.yil})`;
+      sel.appendChild(opt);
+    });
+  });
+}
+
 async function izlemeLoglariniYukle() {
   const tbody = document.getElementById('izlemeTableBody');
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;"><div class="spinner" style="margin:auto;"></div></td></tr>';
+
+  const orgId = document.getElementById('izlemeOrgFilter')?.value || '';
+  const tur   = document.getElementById('izlemeTurFilter')?.value || '';
+
   try {
-    const r = await fetch('/api/admin/izleme-loglari?limit=200');
+    const params = new URLSearchParams({ limit: 300 });
+    if (orgId) params.set('org_id', orgId);
+    if (tur === 'izleme') params.set('sadece_izleme', '1');
+    if (tur === 'arama')  params.set('sadece_arama', '1');
+
+    const r = await fetch('/api/admin/izleme-loglari?' + params.toString());
     const loglar = await r.json();
     tbody.innerHTML = '';
     if (loglar.length === 0) {
@@ -835,22 +859,18 @@ async function izlemeLoglariniYukle() {
       return;
     }
     loglar.forEach(l => {
+      const isIzleme = !!l.video_id;
       const tr = document.createElement('tr');
-      const tur = l.video_id ? 'İzleme' : 'Arama';
       tr.innerHTML = `
         <td style="font-size:0.8rem; color:var(--text3); white-space:nowrap;">${tarihFormat(l.tarih)}</td>
         <td style="font-weight:500;">${escHtml(l.aranan_isim || '-')}</td>
         <td style="font-size:0.85rem;">
-          ${l.video_baslik ? escHtml(l.video_baslik) : ''}
-          ${l.bagisci_adi ? `<span style="color:var(--text3)"> — ${escHtml(l.bagisci_adi)}</span>` : ''}
-          ${!l.video_id && !l.bagisci_adi ? '<span style="color:var(--text3)">-</span>' : ''}
+          ${l.bagisci_adi ? `<strong>${escHtml(l.bagisci_adi)}</strong>` : ''}
+          ${l.video_baslik ? `<span style="color:var(--text3)"> — ${escHtml(l.video_baslik)}</span>` : ''}
+          ${!l.bagisci_adi && !l.video_baslik ? '<span style="color:var(--text3)">-</span>' : ''}
         </td>
         <td style="font-family:monospace; font-size:0.8rem; color:var(--text3);">${escHtml(l.ip_adresi || '-')}</td>
-        <td>
-          <span class="badge ${l.video_id ? 'badge-green' : 'badge-yellow'}">
-            ${tur}
-          </span>
-        </td>
+        <td><span class="badge ${isIzleme ? 'badge-green' : 'badge-yellow'}">${isIzleme ? 'İzleme' : 'Arama'}</span></td>
       `;
       tbody.appendChild(tr);
     });
@@ -1015,20 +1035,24 @@ function toast(msg, tip = 'info', sure = 3500) {
 }
 
 // ─── İÇDER'DEN AKTAR ─────────────────────────────────────────────────────────
-function aktarOrgListesiDoldur() {
-  const sel = document.getElementById('aktarOrgInput');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">Organizasyon seçin</option>';
-  organizasyonlar.forEach(o => {
-    const opt = document.createElement('option');
-    opt.value = o.id;
-    opt.textContent = `${o.ad} (${o.yil})`;
-    sel.appendChild(opt);
+function topluVeAktarOrgDoldur() {
+  ['aktarOrgInput', 'topluOrgInput'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Organizasyon seçin</option>';
+    organizasyonlar.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.id;
+      opt.textContent = `${o.ad} (${o.yil})`;
+      sel.appendChild(opt);
+    });
   });
 }
 
-async function icderdenAktar() {
-  const orgId = document.getElementById('aktarOrgInput')?.value;
+// Eski fonksiyon adı uyumluluğu için
+function aktarOrgListesiDoldur() { topluVeAktarOrgDoldur(); }
+
+async function icderdenAktar() {  const orgId = document.getElementById('aktarOrgInput')?.value;
   if (!orgId) { toast('Hedef organizasyon seçin', 'error'); return; }
   const sonuc = document.getElementById('aktarSonuc');
   sonuc.textContent = 'Aktarılıyor...';
@@ -1050,4 +1074,60 @@ async function icderdenAktar() {
     sonuc.textContent = '❌ Bağlantı hatası';
     toast('Bağlantı hatası', 'error');
   }
+}
+
+// ─── TOPLU BAĞIŞÇI EKLE ───────────────────────────────────────────────────────
+async function topluBagisciEkle() {
+  const orgId = document.getElementById('topluOrgInput')?.value;
+  const metin = document.getElementById('topluListeInput')?.value?.trim();
+  const sonuc = document.getElementById('topluSonuc');
+  if (!orgId) { toast('Organizasyon seçin', 'error'); return; }
+  if (!metin) { toast('Liste boş', 'error'); return; }
+
+  const satirlar = metin.split('\n').map(s => s.trim()).filter(Boolean);
+  const liste = satirlar.map(satir => {
+    const parcalar = satir.split('|').map(s => s.trim());
+    return { ad: parcalar[0], telefon: parcalar[1] || '' };
+  }).filter(x => x.ad);
+
+  if (liste.length === 0) { toast('Geçerli isim bulunamadı', 'error'); return; }
+
+  sonuc.textContent = `${liste.length} kayıt gönderiliyor...`;
+  try {
+    const r = await fetch('/api/admin/bagiscilar/toplu-ekle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organizasyon_id: orgId, liste })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      sonuc.textContent = `✅ ${d.eklenen} bağışçı eklendi`;
+      document.getElementById('topluListeInput').value = '';
+      toast(`${d.eklenen} bağışçı eklendi`, 'success');
+      bagiscilarYukle();
+    } else {
+      sonuc.textContent = '❌ ' + (d.hata || 'Hata');
+      toast(d.hata || 'Hata', 'error');
+    }
+  } catch (e) {
+    sonuc.textContent = '❌ Bağlantı hatası';
+    toast('Bağlantı hatası', 'error');
+  }
+}
+
+// ─── VİDEO LİNK KOPYALA ──────────────────────────────────────────────────────
+function videoLinkKopyala(videoId) {
+  const link = `${window.location.origin}/video/${videoId}`;
+  navigator.clipboard.writeText(link).then(() => {
+    toast('Link kopyalandı: ' + link, 'success', 4000);
+  }).catch(() => {
+    // Fallback
+    const inp = document.createElement('input');
+    inp.value = link;
+    document.body.appendChild(inp);
+    inp.select();
+    document.execCommand('copy');
+    document.body.removeChild(inp);
+    toast('Link kopyalandı', 'success');
+  });
 }

@@ -3,20 +3,19 @@
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let aramaTimeout = null;
 let aktifVideo = null;
+let tumVideolar = []; // /video/:id için cache
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   await ayarlariYukle();
   await organizasyonlariYukle();
+  urlRouteIsle(); // URL'e göre sayfa durumunu ayarla
 
   const input = document.getElementById('searchInput');
   input.addEventListener('input', () => {
     clearTimeout(aramaTimeout);
     const q = input.value.trim();
-    if (q.length === 0) {
-      sonuclariGizle();
-      return;
-    }
+    if (q.length === 0) { sonuclariGizle(); urlGuncelle(''); return; }
     aramaTimeout = setTimeout(aramaYap, 400);
   });
 
@@ -24,16 +23,58 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Enter') { clearTimeout(aramaTimeout); aramaYap(); }
   });
 
+  // Geri/ileri tuşu (browser history)
+  window.addEventListener('popstate', () => urlRouteIsle());
+
   // Modal dışına tıklayınca kapat
   document.getElementById('videoModal').addEventListener('click', e => {
     if (e.target === document.getElementById('videoModal')) modalKapat();
   });
 
-  // ESC ile kapat
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') modalKapat();
   });
 });
+
+// ─── URL ROUTER ──────────────────────────────────────────────────────────────
+// /          → ana sayfa
+// /ara?q=... → arama sonuçları
+// /video/:id → direkt video aç
+function urlRouteIsle() {
+  const path = window.location.pathname;
+  const params = new URLSearchParams(window.location.search);
+
+  if (path.startsWith('/video/')) {
+    const videoId = path.split('/video/')[1];
+    if (videoId) videoIdIleAc(parseInt(videoId));
+    return;
+  }
+
+  if (path === '/ara' || params.has('q')) {
+    const q = params.get('q') || '';
+    if (q) {
+      document.getElementById('searchInput').value = q;
+      aramaYap(false); // URL'i tekrar güncelleme
+    }
+    return;
+  }
+
+  // Ana sayfa — temiz
+  sonuclariGizle();
+}
+
+// URL'i güncelle (history push)
+function urlGuncelle(q, videoId) {
+  if (videoId) {
+    history.pushState({ videoId }, '', `/video/${videoId}`);
+    return;
+  }
+  if (q) {
+    history.pushState({ q }, '', `/ara?q=${encodeURIComponent(q)}`);
+  } else {
+    history.pushState({}, '', '/');
+  }
+}
 
 // ─── AYARLAR ─────────────────────────────────────────────────────────────────
 async function ayarlariYukle() {
@@ -67,7 +108,6 @@ async function organizasyonlariYukle() {
       });
       document.getElementById('orgSelectorWrap').style.display = 'block';
     }
-    // Aktif organizasyonu seç
     const aktifR = await fetch('/api/aktif-organizasyon');
     const aktifD = await aktifR.json();
     if (aktifD.organizasyon) {
@@ -77,11 +117,12 @@ async function organizasyonlariYukle() {
 }
 
 // ─── ARAMA ───────────────────────────────────────────────────────────────────
-async function aramaYap() {
+async function aramaYap(guncelleUrl = true) {
   const q = document.getElementById('searchInput').value.trim();
-  if (!q) { sonuclariGizle(); return; }
+  if (!q) { sonuclariGizle(); urlGuncelle(''); return; }
 
   const orgId = document.getElementById('orgSelect')?.value || '';
+  if (guncelleUrl) urlGuncelle(q);
 
   yuklemeyiGoster();
 
@@ -90,7 +131,8 @@ async function aramaYap() {
     if (orgId) params.set('org_id', orgId);
     const r = await fetch('/api/ara?' + params.toString());
     const d = await r.json();
-    sonuclariGoster(d.sonuclar || [], q);
+    tumVideolar = d.sonuclar || [];
+    sonuclariGoster(tumVideolar, q);
   } catch (e) {
     yuklemeyiGizle();
     toast('Arama sırasında hata oluştu', 'error');
@@ -127,7 +169,7 @@ function sonuclariGoster(sonuclar, q) {
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('resultsSection').style.display = 'block';
   document.getElementById('resultsCount').innerHTML =
-    `<span>${sonuclar.length}</span> video bulundu — "<strong>${q}</strong>"`;
+    `<span>${sonuclar.length}</span> video bulundu — "<strong>${escHtml(q)}</strong>"`;
 
   const grid = document.getElementById('videoGrid');
   grid.innerHTML = '';
@@ -138,7 +180,8 @@ function sonuclariGoster(sonuclar, q) {
     card.onclick = () => videoAc(v, q);
 
     const thumbHtml = v.thumbnail_url
-      ? `<img src="${v.thumbnail_url}" alt="Thumbnail" loading="lazy" onerror="this.parentElement.innerHTML='<div class=video-thumb-placeholder><i class=fas fa-video></i></div>'">`
+      ? `<img src="${escHtml(v.thumbnail_url)}" alt="Thumbnail" loading="lazy"
+           onerror="this.parentElement.innerHTML='<div class=video-thumb-placeholder><i class=fas\\ fa-video></i></div>'">`
       : `<div class="video-thumb-placeholder"><i class="fas fa-video"></i></div>`;
 
     card.innerHTML = `
@@ -161,10 +204,42 @@ function sonuclariGoster(sonuclar, q) {
   });
 }
 
+// ─── VİDEO AÇ (ID ile — direkt link) ────────────────────────────────────────
+async function videoIdIleAc(id) {
+  // Önce cache'de ara
+  let v = tumVideolar.find(x => x.id === id);
+
+  // Cache'de yoksa API'den çek
+  if (!v) {
+    try {
+      yuklemeyiGoster();
+      const r = await fetch('/api/video/' + id);
+      if (r.ok) {
+        v = await r.json();
+        yuklemeyiGizle();
+      } else {
+        yuklemeyiGizle();
+        toast('Video bulunamadı', 'error');
+        return;
+      }
+    } catch (e) {
+      yuklemeyiGizle();
+      toast('Video yüklenemedi', 'error');
+      return;
+    }
+  }
+
+  videoAc(v, v.bagisci_adi, false); // URL'i tekrar güncelleme
+}
+
 // ─── VİDEO MODAL ─────────────────────────────────────────────────────────────
-function videoAc(v, arananIsim) {
+function videoAc(v, arananIsim, guncelleUrl = true) {
   aktifVideo = v;
-  document.getElementById('modalTitle').textContent = v.baslik || (v.bagisci_adi + ' - Kurban Videosu');
+
+  if (guncelleUrl) urlGuncelle(null, v.id);
+
+  document.getElementById('modalTitle').textContent =
+    v.baslik || (v.bagisci_adi + ' - Kurban Videosu');
   document.getElementById('modalOwner').textContent = v.bagisci_adi;
   document.getElementById('modalOrg').textContent = v.organizasyon_adi || '';
   document.getElementById('modalVideoNo').textContent = v.video_no + '. Video';
@@ -194,13 +269,24 @@ function modalKapat() {
   video.src = '';
   document.getElementById('videoModal').classList.add('hidden');
   document.body.style.overflow = '';
+
+  // URL'i geri al — arama varsa /ara?q=... yoksa /
+  const q = document.getElementById('searchInput').value.trim();
+  if (q) {
+    history.replaceState({ q }, '', `/ara?q=${encodeURIComponent(q)}`);
+  } else {
+    history.replaceState({}, '', '/');
+  }
+
   aktifVideo = null;
 }
 
 // ─── YARDIMCI ─────────────────────────────────────────────────────────────────
 function escHtml(str) {
   if (!str) return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function toast(msg, tip = 'info', sure = 3500) {

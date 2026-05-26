@@ -64,6 +64,21 @@ function fuzzyScore(query, target) {
   return Math.round(similarity * 60);
 }
 
+// ─── TEK VİDEO (direkt link için) ────────────────────────────────────────────
+router.get('/video/:id', ac(async (req, res) => {
+  const db = await getDb();
+  const v = db.prepare(`
+    SELECT v.*, b.ad as bagisci_adi, b.telefon as bagisci_telefon,
+           o.ad as organizasyon_adi
+    FROM videolar v
+    JOIN bagiscilar b ON v.bagisci_id = b.id
+    JOIN organizasyonlar o ON v.organizasyon_id = o.id
+    WHERE v.id = ?
+  `).get(req.params.id);
+  if (!v) return res.status(404).json({ hata: 'Video bulunamadı' });
+  res.json(v);
+}));
+
 // ─── AKTİF ORGANİZASYON ──────────────────────────────────────────────────────
 router.get('/aktif-organizasyon', ac(async (req, res) => {
   const db = await getDb();

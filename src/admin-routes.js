@@ -246,7 +246,7 @@ router.delete('/videolar/:id', adminKontrol, ac(async (req, res) => {
 
 // ─── İZLEME LOGLARI ──────────────────────────────────────────────────────────
 router.get('/izleme-loglari', adminKontrol, ac(async (req, res) => {
-  const { limit = 200, video_id, org_id } = req.query;
+  const { limit = 300, video_id, org_id, sadece_izleme, sadece_arama } = req.query;
   const db = await getDb();
   let sql = `
     SELECT l.*, v.baslik as video_baslik, b.ad as bagisci_adi, o.ad as organizasyon_adi
@@ -257,10 +257,12 @@ router.get('/izleme-loglari', adminKontrol, ac(async (req, res) => {
     WHERE 1=1
   `;
   const params = [];
-  if (video_id) { sql += ' AND l.video_id=?'; params.push(video_id); }
-  if (org_id)   { sql += ' AND v.organizasyon_id=?'; params.push(org_id); }
+  if (video_id)       { sql += ' AND l.video_id=?'; params.push(video_id); }
+  if (org_id)         { sql += ' AND v.organizasyon_id=?'; params.push(org_id); }
+  if (sadece_izleme)  { sql += ' AND l.video_id IS NOT NULL'; }
+  if (sadece_arama)   { sql += ' AND l.video_id IS NULL'; }
   sql += ' ORDER BY l.tarih DESC LIMIT ?';
-  params.push(parseInt(limit) || 200);
+  params.push(parseInt(limit) || 300);
   res.json(db.prepare(sql).all(...params));
 }));
 

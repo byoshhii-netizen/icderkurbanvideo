@@ -167,6 +167,14 @@
         <div class="table-wrap">
           <div class="table-toolbar">
             <span class="table-toolbar-title"><i class="fas fa-eye" style="color:var(--accent)"></i> İzleme Logları</span>
+            <select class="form-select" id="izlemeOrgFilter" onchange="izlemeLoglariniYukle()" style="width:auto; padding:6px 10px;">
+              <option value="">Tüm organizasyonlar</option>
+            </select>
+            <select class="form-select" id="izlemeTurFilter" onchange="izlemeLoglariniYukle()" style="width:auto; padding:6px 10px;">
+              <option value="">Tüm türler</option>
+              <option value="izleme">Sadece İzleme</option>
+              <option value="arama">Sadece Arama</option>
+            </select>
             <button class="btn btn-ghost btn-sm" onclick="izlemeLoglariniYukle()">
               <i class="fas fa-sync"></i> Yenile
             </button>
@@ -263,6 +271,29 @@
             <a href="/api/admin/yedek-indir" class="btn btn-ghost btn-sm" target="_blank">
               <i class="fas fa-download"></i> DB İndir (.db)
             </a>
+          </div>
+
+          <!-- Toplu Bağışçı Yükleme -->
+          <div class="panel-section">
+            <div class="panel-section-title"><i class="fas fa-list"></i> Toplu Bağışçı Ekle</div>
+            <p style="font-size:0.85rem; color:var(--text3); margin-bottom:12px;">
+              Her satıra bir isim yazın. İsteğe bağlı telefon: <code style="color:var(--accent)">İsim | 5XXXXXXXXX</code>
+            </p>
+            <div class="form-group">
+              <label class="form-label">Organizasyon</label>
+              <select class="form-select" id="topluOrgInput">
+                <option value="">Organizasyon seçin</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">İsim Listesi</label>
+              <textarea class="form-textarea" id="topluListeInput" rows="6"
+                placeholder="İsmail Demircan&#10;Mehmet Yıldız | 5321234567&#10;Fatma Kaya"></textarea>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="topluBagisciEkle()">
+              <i class="fas fa-users"></i> Toplu Ekle
+            </button>
+            <div id="topluSonuc" style="margin-top:10px; font-size:0.85rem; color:var(--accent);"></div>
           </div>
 
           <!-- İÇDER'den Aktar -->
