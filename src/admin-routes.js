@@ -305,37 +305,140 @@ router.get('/yedek-indir', adminKontrol, ac(async (req, res) => {
   res.sendFile(dbPath);
 }));
 
-// ─── İÇDER KURBAN'DAN BAĞIŞÇI AKTAR ─────────────────────────────────────────
-router.post('/icder-aktar', adminKontrol, ac(async (req, res) => {
-  const { organizasyon_id } = req.body;
-  if (!organizasyon_id) return res.status(400).json({ hata: 'organizasyon_id gerekli' });
+// ─── İÇDER KURBAN ENTEGRASYONU ───────────────────────────────────────────────
+// İÇDER DB'sini oku — lokal dosya veya API üzerinden
+async function icderDbOku() {
   const fs = require('fs');
   const path = require('path');
-  const icderDbPath = path.join(__dirname, '..', '..', 'icderrr-clone', 'data', 'icder-kurban.db');
-  if (!fs.existsSync(icderDbPath))
-    return res.status(404).json({ hata: 'İÇDER veritabanı bulunamadı (sadece lokal çalışır)' });
-  const initSqlJs = require('sql.js');
-  const SQL = await initSqlJs();
-  const icderDb = new SQL.Database(fs.readFileSync(icderDbPath));
-  const stmt = icderDb.prepare(`
-    SELECT DISTINCT h.bagisci_adi, h.bagisci_telefon
-    FROM hisseler h WHERE h.bagisci_adi IS NOT NULL AND h.bagisci_adi != ''
-  `);
+
+  // 1. Lokal DB dosyası dene (aynı sunucuda çalışıyorsa)
+  const olasiYollar = [
+    path.join(__dirname, '..', '..', 'icderrr-clone', 'data', 'icder-kurban.db'),
+    path.join(__dirname, '..', '..', 'icderrr-clone', 'data', 'kurban.db'),
+    '/data/icder-kurban.db', // Railway volume
+  ];
+
+  for (const dbYolu of olasiYollar) {
+    if (fs.existsSync(dbYolu)) {
+      const initSqlJs = require('sql.js');
+      const SQL = await initSqlJs();
+      const db = new SQL.Database(fs.readFileSync(dbYolu));
+      return { tip: 'dosya', db, yol: dbYolu };
+    }
+  }
+
+  return null; // Bulunamadı
+}
+
+// İÇDER organizasyonlarını listele
+router.get('/icder-organizasyonlar', adminKontrol, ac(async (req, res) => {
+  const sonuc = await icderDbOku();
+  if (!sonuc) {
+    return res.json({ organizasyonlar: [], mesaj: 'İÇDER veritabanı bulunamadı. Lokal kurulumda çalışır.' });
+  }
+
+  const { db } = sonuc;
+  const stmt = db.prepare('SELECT id, ad, yil, aktif FROM organizasyonlar ORDER BY yil DESC, id DESC');
+  const orgs = [];
+  try {
+    stmt.bind([]);
+    while (stmt.step()) {
+      const row = stmt.getAsObject();
+      // Her org için bağışçı sayısını da al
+      const sayacStmt = db.prepare(`
+        SELECT COUNT(DISTINCT h.bagisci_adi) as c
+        FROM hisseler h
+        JOIN kurbanlar k ON h.kurban_id = k.id
+        WHERE k.organizasyon_id = ? AND h.bagisci_adi IS NOT NULL AND h.bagisci_adi != ''
+      `);
+      sayacStmt.bind([row.id]);
+      let bagisciSayisi = 0;
+      if (sayacStmt.step()) bagisciSayisi = sayacStmt.getAsObject().c || 0;
+      sayacStmt.free();
+      orgs.push({ ...row, bagisci_sayisi: bagisciSayisi });
+    }
+  } finally { stmt.free(); }
+  db.close();
+
+  res.json({ organizasyonlar: orgs });
+}));
+
+// İÇDER'den bağışçı aktar — gelişmiş versiyon
+router.post('/icder-aktar', adminKontrol, ac(async (req, res) => {
+  const { organizasyon_id, icder_org_id, uzerine_yaz } = req.body;
+  if (!organizasyon_id) return res.status(400).json({ hata: 'organizasyon_id gerekli' });
+
+  const sonuc = await icderDbOku();
+  if (!sonuc) {
+    return res.status(404).json({
+      hata: 'İÇDER veritabanı bulunamadı. Bu özellik sadece lokal kurulumda çalışır.'
+    });
+  }
+
+  const { db: icderDb } = sonuc;
+
+  // Bağışçıları çek
+  let sorgu = `
+    SELECT DISTINCT
+      h.bagisci_adi as ad,
+      h.bagisci_telefon as telefon
+    FROM hisseler h
+    JOIN kurbanlar k ON h.kurban_id = k.id
+    WHERE h.bagisci_adi IS NOT NULL AND h.bagisci_adi != ''
+  `;
+  const params = [];
+  if (icder_org_id) {
+    sorgu += ' AND k.organizasyon_id = ?';
+    params.push(icder_org_id);
+  }
+  sorgu += ' ORDER BY h.bagisci_adi ASC';
+
+  const stmt = icderDb.prepare(sorgu);
   const bagiscilar = [];
-  try { stmt.bind([]); while (stmt.step()) bagiscilar.push(stmt.getAsObject()); }
-  finally { stmt.free(); }
+  try {
+    stmt.bind(params);
+    while (stmt.step()) bagiscilar.push(stmt.getAsObject());
+  } finally { stmt.free(); }
   icderDb.close();
+
   const db = await getDb();
   let eklenen = 0;
+  let atlanan = 0;
+  let guncellenen = 0;
+
   bagiscilar.forEach(b => {
-    if (!b.bagisci_adi) return;
-    try {
-      db.prepare('INSERT INTO bagiscilar (ad, telefon, organizasyon_id) VALUES (?, ?, ?)')
-        .run(b.bagisci_adi, normalizeTelefon(b.bagisci_telefon), organizasyon_id);
-      eklenen++;
-    } catch (_) {}
+    if (!b.ad) return;
+    const tel = normalizeTelefon(b.telefon);
+
+    // Zaten var mı? (aynı isim + aynı org)
+    const mevcut = db.prepare(
+      'SELECT id FROM bagiscilar WHERE ad=? AND organizasyon_id=?'
+    ).get(b.ad, organizasyon_id);
+
+    if (mevcut) {
+      if (uzerine_yaz && tel) {
+        db.prepare('UPDATE bagiscilar SET telefon=? WHERE id=?').run(tel, mevcut.id);
+        guncellenen++;
+      } else {
+        atlanan++;
+      }
+    } else {
+      try {
+        db.prepare('INSERT INTO bagiscilar (ad, telefon, organizasyon_id) VALUES (?, ?, ?)')
+          .run(b.ad, tel, organizasyon_id);
+        eklenen++;
+      } catch (_) { atlanan++; }
+    }
   });
-  res.json({ ok: true, eklenen, toplam: bagiscilar.length });
+
+  res.json({
+    ok: true,
+    eklenen,
+    atlanan,
+    guncellenen,
+    toplam: bagiscilar.length,
+    mesaj: `${eklenen} yeni eklendi, ${atlanan} atlandı${guncellenen ? `, ${guncellenen} güncellendi` : ''}`
+  });
 }));
 
 module.exports = router;

@@ -299,19 +299,44 @@
           <!-- İÇDER'den Aktar -->
           <div class="panel-section">
             <div class="panel-section-title"><i class="fas fa-file-import"></i> İÇDER Kurban'dan Bağışçı Aktar</div>
-            <p style="font-size:0.85rem; color:var(--text3); margin-bottom:16px;">
-              İÇDER Kurban programındaki bağışçıları bu sisteme aktarır.
+            <p style="font-size:0.85rem; color:var(--text3); margin-bottom:12px;">
+              İÇDER Kurban programındaki bağışçıları otomatik çeker. Lokal kurulumda çalışır.
             </p>
+
             <div class="form-group">
-              <label class="form-label">Hedef Organizasyon</label>
+              <label class="form-label">İÇDER Organizasyonu <small style="color:var(--text3)">(kaynak)</small></label>
+              <div style="display:flex; gap:8px;">
+                <select class="form-select" id="icderOrgInput" style="flex:1;">
+                  <option value="">Önce yükle...</option>
+                </select>
+                <button class="btn btn-ghost btn-sm" onclick="icderOrglariYukle()" title="Yenile">
+                  <i class="fas fa-sync"></i>
+                </button>
+              </div>
+              <div id="icderOrgDurum" style="font-size:0.8rem; color:var(--text3); margin-top:4px;"></div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Hedef Organizasyon <small style="color:var(--text3)">(bu sisteme)</small></label>
               <select class="form-select" id="aktarOrgInput">
                 <option value="">Organizasyon seçin</option>
               </select>
             </div>
+
+            <div class="form-group">
+              <div class="toggle-wrap">
+                <label class="toggle">
+                  <input type="checkbox" id="uzerineYazToggle">
+                  <span class="toggle-slider"></span>
+                </label>
+                <span style="font-size:0.85rem; color:var(--text2);">Mevcut kayıtların telefonunu güncelle</span>
+              </div>
+            </div>
+
             <button class="btn btn-primary btn-sm" onclick="icderdenAktar()">
-              <i class="fas fa-file-import"></i> Aktar
+              <i class="fas fa-file-import"></i> Bağışçıları Aktar
             </button>
-            <div id="aktarSonuc" style="margin-top:10px; font-size:0.85rem; color:var(--accent);"></div>
+            <div id="aktarSonuc" style="margin-top:10px; font-size:0.85rem;"></div>
           </div>
 
           <!-- Admin Şifre Değiştir -->

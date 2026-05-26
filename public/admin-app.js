@@ -52,7 +52,7 @@ function sayfaGit(sayfa) {
   else if (sayfa === 'bagiscilar') bagiscilarYukle();
   else if (sayfa === 'videolar') videolarYukle();
   else if (sayfa === 'izleme') { izlemeOrgFilterDoldur(); izlemeLoglariniYukle(); }
-  else if (sayfa === 'ayarlar') { ayarlariYukle(); setTimeout(topluVeAktarOrgDoldur, 200); }
+  else if (sayfa === 'ayarlar') { ayarlariYukle(); setTimeout(() => { topluVeAktarOrgDoldur(); icderOrglariYukle(); }, 200); }
 }
 
 // ─── SIDEBAR MOBILE ───────────────────────────────────────────────────────────
@@ -1052,25 +1052,67 @@ function topluVeAktarOrgDoldur() {
 // Eski fonksiyon adı uyumluluğu için
 function aktarOrgListesiDoldur() { topluVeAktarOrgDoldur(); }
 
-async function icderdenAktar() {  const orgId = document.getElementById('aktarOrgInput')?.value;
-  if (!orgId) { toast('Hedef organizasyon seçin', 'error'); return; }
+// ─── İÇDER ORGANİZASYONLARI YÜKLE ──────────────────────────────────────────
+async function icderOrglariYukle() {
+  const sel = document.getElementById('icderOrgInput');
+  const durum = document.getElementById('icderOrgDurum');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Yükleniyor...</option>';
+  if (durum) durum.textContent = '';
+  try {
+    const r = await fetch('/api/admin/icder-organizasyonlar');
+    const d = await r.json();
+    sel.innerHTML = '<option value="">Tüm organizasyonlar (hepsi)</option>';
+    if (d.mesaj) {
+      if (durum) durum.textContent = '⚠️ ' + d.mesaj;
+      sel.innerHTML = '<option value="">Bulunamadı</option>';
+      return;
+    }
+    if (!d.organizasyonlar || d.organizasyonlar.length === 0) {
+      if (durum) durum.textContent = 'İÇDER\'de organizasyon bulunamadı';
+      return;
+    }
+    d.organizasyonlar.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.id;
+      opt.textContent = `${o.ad} (${o.yil}) — ${o.bagisci_sayisi} bağışçı`;
+      sel.appendChild(opt);
+    });
+    if (durum) durum.textContent = `✅ ${d.organizasyonlar.length} organizasyon bulundu`;
+  } catch (e) {
+    sel.innerHTML = '<option value="">Bağlantı hatası</option>';
+    if (durum) durum.textContent = '❌ ' + e.message;
+  }
+}
+
+async function icderdenAktar() {
+  const icderOrgId = document.getElementById('icderOrgInput')?.value || '';
+  const orgId = document.getElementById('aktarOrgInput')?.value;
+  const uzerineYaz = document.getElementById('uzerineYazToggle')?.checked || false;
   const sonuc = document.getElementById('aktarSonuc');
+  if (!orgId) { toast('Hedef organizasyon seçin', 'error'); return; }
   sonuc.textContent = 'Aktarılıyor...';
+  sonuc.style.color = 'var(--text3)';
   try {
     const r = await fetch('/api/admin/icder-aktar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ organizasyon_id: orgId })
+      body: JSON.stringify({ organizasyon_id: orgId, icder_org_id: icderOrgId || null, uzerine_yaz: uzerineYaz })
     });
     const d = await r.json();
     if (d.ok) {
-      sonuc.textContent = `✅ ${d.eklenen} bağışçı aktarıldı (toplam ${d.toplam} bulundu)`;
-      toast(`${d.eklenen} bağışçı aktarıldı`, 'success');
+      sonuc.style.color = 'var(--accent)';
+      sonuc.textContent = '✅ ' + d.mesaj;
+      toast(d.mesaj, 'success', 5000);
+      bagiscilarYukle();
+      dashboardYukle();
     } else {
+      sonuc.style.color = 'var(--red)';
       sonuc.textContent = '❌ ' + (d.hata || 'Hata');
       toast(d.hata || 'Aktarma hatası', 'error');
     }
   } catch (e) {
+    sonuc.style.color = 'var(--red)';
     sonuc.textContent = '❌ Bağlantı hatası';
     toast('Bağlantı hatası', 'error');
   }
