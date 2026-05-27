@@ -76,6 +76,38 @@
   </div>
 </div>
 
+<!-- ŞİFRE / TELEFON DOĞRULAMA MODALI -->
+<div class="modal-overlay hidden" id="sifreModal">
+  <div class="modal-box sifre-modal-box">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-lock" style="color:var(--accent);margin-right:8px"></i>Kimlik Doğrulama</div>
+    </div>
+    <div class="modal-body" style="padding:28px 24px;">
+      <p style="color:var(--text2);margin-bottom:20px;font-size:0.95rem;">
+        Videoyu izlemek için kayıtlı telefon numaranızı girin.
+      </p>
+      <div class="form-group">
+        <label class="form-label" for="sifreTelefonInput">Telefon Numarası</label>
+        <input
+          type="tel"
+          class="form-input"
+          id="sifreTelefonInput"
+          placeholder="05XX XXX XX XX"
+          autocomplete="tel"
+          onkeydown="if(event.key==='Enter') sifreDogrula()"
+        >
+      </div>
+      <p id="sifreHata" style="color:var(--red);font-size:0.85rem;min-height:20px;margin-bottom:12px;"></p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="sifreModalKapat()">İptal</button>
+        <button class="btn btn-primary" id="sifreDogrulaBtn" onclick="sifreDogrula()">
+          <i class="fas fa-check"></i> Doğrula
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- VİDEO MODAL -->
 <div class="modal-overlay hidden" id="videoModal">
   <div class="modal-box">

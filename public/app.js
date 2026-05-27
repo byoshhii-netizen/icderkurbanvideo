@@ -4,6 +4,9 @@
 let aramaTimeout = null;
 let aktifVideo = null;
 let tumVideolar = []; // /video/:id için cache
+let sifreSistemiAktif = false;
+let dogrulanmisTelefon = null; // oturum boyunca bir kez doğrulama yeterli
+let bekleyenVideo = null;      // şifre onayı beklenen video
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -31,8 +34,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.target === document.getElementById('videoModal')) modalKapat();
   });
 
+  // Şifre modalı — dışına tıklayınca kapat
+  document.getElementById('sifreModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('sifreModal')) sifreModalKapat();
+  });
+
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') modalKapat();
+    if (e.key === 'Escape') {
+      modalKapat();
+      sifreModalKapat();
+    }
   });
 });
 
@@ -90,6 +101,7 @@ async function ayarlariYukle() {
       img.src = d.site_logo_b64;
       img.style.display = 'block';
     }
+    sifreSistemiAktif = d.sifre_sistemi_aktif === '1';
   } catch (e) {}
 }
 
@@ -234,6 +246,17 @@ async function videoIdIleAc(id) {
 
 // ─── VİDEO MODAL ─────────────────────────────────────────────────────────────
 function videoAc(v, arananIsim, guncelleUrl = true) {
+  // Şifre sistemi aktifse ve henüz doğrulanmamışsa önce telefon sor
+  if (sifreSistemiAktif && !dogrulanmisTelefon) {
+    bekleyenVideo = { v, arananIsim, guncelleUrl };
+    sifreModalAc();
+    return;
+  }
+
+  _videoAcGercek(v, arananIsim, guncelleUrl);
+}
+
+function _videoAcGercek(v, arananIsim, guncelleUrl) {
   aktifVideo = v;
 
   if (guncelleUrl) urlGuncelle(null, v.id);
@@ -261,6 +284,66 @@ function videoAc(v, arananIsim, guncelleUrl = true) {
       aranan_isim: arananIsim || document.getElementById('searchInput').value.trim()
     })
   }).catch(() => {});
+}
+
+// ─── ŞİFRE MODALI ────────────────────────────────────────────────────────────
+function sifreModalAc() {
+  const modal = document.getElementById('sifreModal');
+  modal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('sifreTelefonInput').value = '';
+  document.getElementById('sifreHata').textContent = '';
+  document.getElementById('sifreTelefonInput').focus();
+}
+
+function sifreModalKapat() {
+  document.getElementById('sifreModal').classList.add('hidden');
+  document.body.style.overflow = '';
+  bekleyenVideo = null;
+}
+
+async function sifreDogrula() {
+  const input = document.getElementById('sifreTelefonInput');
+  const telefon = input.value.trim();
+  if (!telefon) {
+    document.getElementById('sifreHata').textContent = 'Lütfen telefon numaranızı girin.';
+    return;
+  }
+
+  const btn = document.getElementById('sifreDogrulaBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Kontrol ediliyor...';
+  document.getElementById('sifreHata').textContent = '';
+
+  try {
+    const r = await fetch('/api/sifre-kontrol', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefon })
+    });
+    const d = await r.json();
+
+    if (r.ok && d.ok) {
+      dogrulanmisTelefon = telefon;
+      document.getElementById('sifreModal').classList.add('hidden');
+      document.body.style.overflow = '';
+
+      // Bekleyen videoyu aç
+      if (bekleyenVideo) {
+        const { v, arananIsim, guncelleUrl } = bekleyenVideo;
+        bekleyenVideo = null;
+        _videoAcGercek(v, arananIsim, guncelleUrl);
+      }
+    } else {
+      document.getElementById('sifreHata').textContent =
+        d.hata || 'Bu numaraya ait kayıt bulunamadı.';
+    }
+  } catch (e) {
+    document.getElementById('sifreHata').textContent = 'Bağlantı hatası, tekrar deneyin.';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-check"></i> Doğrula';
+  }
 }
 
 function modalKapat() {

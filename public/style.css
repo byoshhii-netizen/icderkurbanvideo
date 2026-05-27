@@ -835,6 +835,11 @@ tbody td {
   display: none;
 }
 
+/* ── ŞİFRE MODALI ── */
+.sifre-modal-box {
+  max-width: 420px;
+}
+
 /* ── SEARCH HINT ── */
 .search-hint {
   margin-top: 12px;

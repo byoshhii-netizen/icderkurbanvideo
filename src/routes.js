@@ -183,10 +183,24 @@ router.post('/sifre-kontrol', ac(async (req, res) => {
   if (aktifRow?.deger !== '1') return res.json({ ok: true, mesaj: 'Şifre sistemi kapalı' });
   const { telefon } = req.body;
   if (!telefon) return res.status(400).json({ hata: 'Telefon numarası gerekli' });
-  const temizTelefon = telefon.replace(/\D/g, '').replace(/^0/, '').replace(/^90/, '');
-  const bagisci = db.prepare("SELECT id FROM bagiscilar WHERE REPLACE(REPLACE(telefon, '+90', ''), '0', '') LIKE ?")
-    .get('%' + temizTelefon + '%');
-  if (!bagisci) return res.status(401).json({ hata: 'Bu numaraya ait kayıt bulunamadı' });
+
+  // Girilen numarayı normalize et: sadece rakamlar, başındaki 0 veya 90 kaldır → 10 haneli numara
+  let temizTelefon = telefon.replace(/\D/g, '');
+  if (temizTelefon.startsWith('90') && temizTelefon.length > 10) temizTelefon = temizTelefon.slice(2);
+  if (temizTelefon.startsWith('0')) temizTelefon = temizTelefon.slice(1);
+
+  if (temizTelefon.length < 7) return res.status(400).json({ hata: 'Geçersiz telefon numarası' });
+
+  // DB'deki tüm bağışçıları çek, normalize ederek karşılaştır
+  const bagiscilar = db.prepare('SELECT id, telefon FROM bagiscilar WHERE telefon IS NOT NULL').all();
+  const eslesen = bagiscilar.find(b => {
+    let t = (b.telefon || '').replace(/\D/g, '');
+    if (t.startsWith('90') && t.length > 10) t = t.slice(2);
+    if (t.startsWith('0')) t = t.slice(1);
+    return t === temizTelefon;
+  });
+
+  if (!eslesen) return res.status(401).json({ hata: 'Bu numaraya ait kayıt bulunamadı' });
   req.session.dogrulanmisTelefon = temizTelefon;
   res.json({ ok: true });
 }));
