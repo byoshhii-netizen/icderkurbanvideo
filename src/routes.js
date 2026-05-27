@@ -130,8 +130,17 @@ router.get('/ara', ac(async (req, res) => {
 
   const query = q.trim();
   const skorlu = videolar.map(v => {
-    const alanlar = [v.bagisci_adi, v.baslik, v.arama_etiketleri, v.bagisci_telefon];
-    const maxSkor = Math.max(...alanlar.map(a => fuzzyScore(query, a)));
+    // Etiketleri virgülle böl, her birini ayrı ayrı kontrol et
+    const etiketler = (v.arama_etiketleri || '').split(',').map(e => e.trim()).filter(Boolean);
+    const etiketSkoru = etiketler.length
+      ? Math.max(...etiketler.map(e => fuzzyScore(query, e)))
+      : 0;
+
+    const alanlar = [v.bagisci_adi, v.baslik, v.bagisci_telefon];
+    const alanSkoru = Math.max(...alanlar.map(a => fuzzyScore(query, a)));
+
+    // Etiket eşleşmesi biraz daha öncelikli
+    const maxSkor = Math.max(alanSkoru, etiketSkoru > 0 ? etiketSkoru + 5 : 0);
     return { ...v, _skor: maxSkor };
   }).filter(v => v._skor >= 30);
   skorlu.sort((a, b) => b._skor - a._skor);

@@ -763,27 +763,104 @@ function videoDuzenle(id) {
   fetch('/api/admin/videolar').then(r => r.json()).then(liste => {
     const v = liste.find(x => x.id === id);
     if (!v) return;
+    const thumbHtml = v.thumbnail_url
+      ? `<img src="${escHtml(v.thumbnail_url)}" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;" onerror="this.style.display='none'">`
+      : '';
     modalGoster(`
       <div class="modal-header">
         <div class="modal-title">Video Düzenle</div>
         <button class="modal-close" onclick="modalKapat()"><i class="fas fa-times"></i></button>
       </div>
       <div class="modal-body" style="padding:20px;">
+        ${thumbHtml}
         <div class="form-group">
           <label class="form-label">Başlık</label>
           <input type="text" class="form-input" id="videoBaslikInput" value="${escHtml(v.baslik || '')}">
         </div>
         <div class="form-group">
-          <label class="form-label">Arama Etiketleri</label>
-          <input type="text" class="form-input" id="videoEtiketInput" value="${escHtml(v.arama_etiketleri || '')}">
+          <label class="form-label">Arama Etiketleri <small style="color:var(--text3)">(virgülle ayırın)</small></label>
+          <input type="text" class="form-input" id="videoEtiketInput" value="${escHtml(v.arama_etiketleri || '')}" placeholder="ahmet, yılmaz, büyükbaş">
         </div>
-        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
+
+        <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
+          <div style="font-size:0.85rem;font-weight:600;color:var(--text2);margin-bottom:10px;">
+            <i class="fas fa-video" style="color:var(--accent)"></i> Video Dosyasını Değiştir
+          </div>
+          <div class="upload-area" id="uploadArea" onclick="document.getElementById('videoFileInputDuzenle').click()"
+            ondragover="dragOver(event)" ondrop="dropVideoDuzenle(event, ${id}, '${escHtml(v.cloudinary_public_id || '')}')">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <p>Yeni video yüklemek için tıklayın veya sürükleyin</p>
+            <small>MP4, MOV, WebM — Maks 500MB</small>
+          </div>
+          <input type="file" id="videoFileInputDuzenle" accept="video/*" style="display:none"
+            onchange="videoSecildiDuzenle(this, ${id}, '${escHtml(v.cloudinary_public_id || '')}')">
+          <div class="upload-progress" id="uploadProgress" style="display:none">
+            <div class="upload-progress-bar" id="uploadProgressBar" style="width:0%"></div>
+          </div>
+          <div id="uploadStatusDuzenle" style="font-size:0.85rem;color:var(--text3);margin-top:8px;"></div>
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
           <button class="btn btn-ghost" onclick="modalKapat()">İptal</button>
-          <button class="btn btn-primary" onclick="videoGuncelle(${id})"><i class="fas fa-save"></i> Güncelle</button>
+          <button class="btn btn-primary" onclick="videoGuncelle(${id})"><i class="fas fa-save"></i> Bilgileri Kaydet</button>
         </div>
       </div>
     `);
   });
+}
+
+function dropVideoDuzenle(e, id, eskiPublicId) {
+  e.preventDefault();
+  document.getElementById('uploadArea').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) videoSecildiDosyaDuzenle(file, id, eskiPublicId);
+}
+
+function videoSecildiDuzenle(input, id, eskiPublicId) {
+  if (input.files[0]) videoSecildiDosyaDuzenle(input.files[0], id, eskiPublicId);
+}
+
+async function videoSecildiDosyaDuzenle(file, id, eskiPublicId) {
+  const status = document.getElementById('uploadStatusDuzenle');
+  const area = document.getElementById('uploadArea');
+  const prog = document.getElementById('uploadProgress');
+  const progBar = document.getElementById('uploadProgressBar');
+
+  if (!file.type.startsWith('video/')) { toast('Sadece video dosyası yükleyebilirsiniz', 'error'); return; }
+  if (file.size > 500 * 1024 * 1024) { toast('Dosya 500MB\'dan büyük olamaz', 'error'); return; }
+
+  area.innerHTML = `<i class="fas fa-spinner fa-spin" style="color:var(--accent)"></i><p style="color:var(--accent)">Yükleniyor: ${escHtml(file.name)}</p>`;
+  if (prog) prog.style.display = 'block';
+  if (progBar) progBar.style.width = '20%';
+  if (status) status.textContent = 'Cloudinary\'ye yükleniyor...';
+
+  try {
+    const formData = new FormData();
+    formData.append('video', file);
+    if (eskiPublicId) formData.append('eski_public_id', eskiPublicId);
+
+    if (progBar) progBar.style.width = '50%';
+
+    const r = await fetch('/api/admin/videolar/' + id + '/video-degistir', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (progBar) progBar.style.width = '90%';
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.hata || 'Yükleme hatası');
+
+    if (progBar) progBar.style.width = '100%';
+    if (status) status.innerHTML = '<span style="color:var(--accent)"><i class="fas fa-check-circle"></i> Video değiştirildi!</span>';
+    area.innerHTML = `<i class="fas fa-check-circle" style="color:var(--accent)"></i><p style="color:var(--accent)">Yüklendi: ${escHtml(file.name)}</p>`;
+
+    toast('Video başarıyla değiştirildi', 'success');
+    setTimeout(() => { modalKapat(); videolarYukle(); }, 1200);
+  } catch(e) {
+    if (status) status.innerHTML = `<span style="color:var(--red)"><i class="fas fa-times-circle"></i> ${escHtml(e.message)}</span>`;
+    area.innerHTML = `<i class="fas fa-cloud-upload-alt"></i><p>Tekrar deneyin</p><small>MP4, MOV, WebM — Maks 500MB</small>`;
+    toast('Hata: ' + e.message, 'error');
+  }
 }
 
 async function videoGuncelle(id) {

@@ -234,6 +234,64 @@ router.put('/videolar/:id', adminKontrol, ac(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ─── VİDEO DOSYASINI DEĞİŞTİR ────────────────────────────────────────────────
+router.post('/videolar/:id/video-degistir', adminKontrol, ac(async (req, res) => {
+  const cloudinary = require('cloudinary').v2;
+  const multer = require('multer');
+  const { configureCloudinary } = require('./cloudinary');
+
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 500 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('video/')) cb(null, true);
+      else cb(new Error('Sadece video dosyası yükleyebilirsiniz'));
+    }
+  }).single('video');
+
+  // Multer'ı promise olarak çalıştır
+  await new Promise((resolve, reject) => upload(req, res, err => err ? reject(err) : resolve()));
+
+  if (!req.file) return res.status(400).json({ hata: 'Video dosyası bulunamadı' });
+
+  const db = await getDb();
+  const video = db.prepare('SELECT * FROM videolar WHERE id=?').get(req.params.id);
+  if (!video) return res.status(404).json({ hata: 'Video bulunamadı' });
+
+  configureCloudinary();
+
+  // Yeni videoyu Cloudinary'ye yükle
+  const result = await new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'icder-kurban-videolari',
+        resource_type: 'video',
+        eager: [{ format: 'jpg', transformation: [{ width: 400, height: 300, crop: 'fill' }] }],
+        eager_async: false,
+      },
+      (err, result) => err ? reject(err) : resolve(result)
+    );
+    stream.end(req.file.buffer);
+  });
+
+  const thumbnailUrl = result.eager && result.eager[0]
+    ? result.eager[0].secure_url
+    : result.secure_url.replace('/upload/', '/upload/w_400,h_300,c_fill,f_jpg/').replace(/\.[^.]+$/, '.jpg');
+
+  // Eski videoyu Cloudinary'den sil
+  if (video.cloudinary_public_id) {
+    try {
+      await cloudinary.uploader.destroy(video.cloudinary_public_id, { resource_type: 'video' });
+    } catch(e) { console.warn('[Cloudinary] Eski video silinemedi:', e.message); }
+  }
+
+  // DB'yi güncelle
+  db.prepare('UPDATE videolar SET cloudinary_url=?, cloudinary_public_id=?, thumbnail_url=?, boyut=?, sure=? WHERE id=?')
+    .run(result.secure_url, result.public_id, thumbnailUrl, result.bytes || 0, result.duration || 0, req.params.id);
+
+  res.json({ ok: true, url: result.secure_url, thumbnail_url: thumbnailUrl });
+}));
+
 router.delete('/videolar/:id', adminKontrol, ac(async (req, res) => {
   const db = await getDb();
   const video = db.prepare('SELECT * FROM videolar WHERE id=?').get(req.params.id);
