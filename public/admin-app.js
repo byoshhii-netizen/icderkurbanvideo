@@ -345,7 +345,10 @@ async function aktifOrgSec(id) {
 }
 
 // ─── KURBAN + 7 HİSSE EKLE (icderrr tarzı) ───────────────────────────────────
+let kurbanVideoData = null; // seçilen video dosyası
+
 function kurbanEkleModal() {
+  kurbanVideoData = null;
   const orgOptions = organizasyonlar.map(o =>
     `<option value="${o.id}">${escHtml(o.ad)} (${o.yil})</option>`
   ).join('');
@@ -402,14 +405,72 @@ function kurbanEkleModal() {
         ${hisseSatirlari}
       </div>
 
+      <!-- VİDEO YÜKLEME BÖLÜMÜ -->
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+        <div style="font-size:0.85rem; font-weight:600; color:var(--text2); margin-bottom:10px;">
+          <i class="fas fa-video" style="color:var(--accent)"></i> Video Yükle
+          <small style="font-weight:400; color:var(--text3); margin-left:8px;">Tüm hissedarlara otomatik eklenir — opsiyonel</small>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:0.78rem;">Video Başlığı <small style="color:var(--text3)">(opsiyonel)</small></label>
+            <input type="text" class="form-input" id="kurbanVideoBaslik" placeholder="örn: Büyükbaş Kurban Kesimi">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:0.78rem;">Arama Etiketleri <small style="color:var(--text3)">(virgülle)</small></label>
+            <input type="text" class="form-input" id="kurbanVideoEtiket" placeholder="örn: büyükbaş, 2025">
+          </div>
+        </div>
+        <div class="upload-area" id="kurbanUploadArea"
+          onclick="document.getElementById('kurbanVideoInput').click()"
+          ondragover="kurbanDragOver(event)"
+          ondrop="kurbanDropVideo(event)"
+          style="padding:16px; text-align:center; cursor:pointer;">
+          <i class="fas fa-cloud-upload-alt" style="font-size:1.5rem; color:var(--text3);"></i>
+          <p style="margin:6px 0 2px; color:var(--text3); font-size:0.85rem;">Video seçmek için tıklayın veya sürükleyin</p>
+          <small style="color:var(--text3);">MP4, MOV, WebM — Maks 500MB</small>
+        </div>
+        <input type="file" id="kurbanVideoInput" accept="video/*" style="display:none" onchange="kurbanVideoSecildi(this)">
+        <div class="upload-progress" id="kurbanUploadProgress" style="display:none; margin-top:8px;">
+          <div class="upload-progress-bar" id="kurbanUploadProgressBar" style="width:0%"></div>
+        </div>
+        <div id="kurbanUploadStatus" style="font-size:0.82rem; color:var(--text3); margin-top:6px;"></div>
+      </div>
+
       <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
         <button class="btn btn-ghost" onclick="modalKapat()">İptal</button>
-        <button class="btn btn-primary" onclick="kurbanKaydet()">
-          <i class="fas fa-save"></i> Kurbanı Kaydet
+        <button class="btn btn-primary" id="kurbanKaydetBtn" onclick="kurbanKaydet()">
+          <i class="fas fa-save"></i> Kaydet
         </button>
       </div>
     </div>
   `);
+}
+
+function kurbanDragOver(e) {
+  e.preventDefault();
+  document.getElementById('kurbanUploadArea').classList.add('drag-over');
+}
+
+function kurbanDropVideo(e) {
+  e.preventDefault();
+  document.getElementById('kurbanUploadArea').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) kurbanVideoSecildiDosya(file);
+}
+
+function kurbanVideoSecildi(input) {
+  if (input.files[0]) kurbanVideoSecildiDosya(input.files[0]);
+}
+
+function kurbanVideoSecildiDosya(file) {
+  if (!file.type.startsWith('video/')) { toast('Sadece video dosyası yükleyebilirsiniz', 'error'); return; }
+  if (file.size > 500 * 1024 * 1024) { toast('Dosya 500MB\'dan büyük olamaz', 'error'); return; }
+  kurbanVideoData = file;
+  const area = document.getElementById('kurbanUploadArea');
+  area.innerHTML = `<i class="fas fa-file-video" style="color:var(--accent); font-size:1.3rem;"></i>
+    <p style="margin:6px 0 2px; color:var(--accent); font-size:0.85rem;">${escHtml(file.name)}</p>
+    <small style="color:var(--text3);">${(file.size/1024/1024).toFixed(1)} MB — Kaydet butonuna basın</small>`;
 }
 
 async function kurbanKaydet() {
@@ -428,15 +489,19 @@ async function kurbanKaydet() {
     });
   }
 
-  // En az 1 hisse dolu olmalı
   const doluHisseler = hisseler.filter(h => h.ad);
   if (doluHisseler.length === 0) { toast('En az 1 hisse doldurulmalı', 'error'); return; }
 
-  // Tüm hisseler için ortak grup_id üret (timestamp + random)
+  const btn = document.getElementById('kurbanKaydetBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Kaydediliyor...';
+
   const grupId = `grp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
   try {
+    // 1. Bağışçıları kaydet
     let eklenen = 0;
+    const eklenenIdler = [];
     for (let i = 0; i < 7; i++) {
       const h = hisseler[i];
       if (!h.ad) continue;
@@ -451,16 +516,88 @@ async function kurbanKaydet() {
           etiket1: h.etiket || null,
           etiket2: kupe || null,
           etiket3: h.kiminAdina || null,
-          grup_id: grupId,   // ← hepsi aynı grup
+          grup_id: grupId,
         })
       });
       const d = await r.json();
-      if (d.ok) eklenen++;
+      if (d.ok) { eklenen++; eklenenIdler.push(d.id); }
     }
-    toast(`${eklenen} bağışçı eklendi — grup oluşturuldu (${doluHisseler.length}/7 hisse)`, 'success');
+
+    if (eklenen === 0) { toast('Bağışçı eklenemedi', 'error'); return; }
+
+    // 2. Video varsa yükle
+    if (kurbanVideoData) {
+      const status = document.getElementById('kurbanUploadStatus');
+      const prog = document.getElementById('kurbanUploadProgress');
+      const progBar = document.getElementById('kurbanUploadProgressBar');
+      const baslik = document.getElementById('kurbanVideoBaslik')?.value?.trim();
+      const etiket = document.getElementById('kurbanVideoEtiket')?.value?.trim();
+
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Video yükleniyor...';
+      if (prog) prog.style.display = 'block';
+
+      // Cloudinary'ye yükle
+      const formData = new FormData();
+      formData.append('video', kurbanVideoData);
+
+      const uploadResult = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round(e.loaded / e.total * 100);
+            if (progBar) progBar.style.width = pct + '%';
+            if (status) status.textContent = `Yükleniyor... %${pct}`;
+          }
+        };
+        xhr.onload = () => {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch (_) { reject(new Error('Yanıt parse hatası')); }
+        };
+        xhr.onerror = () => reject(new Error('Ağ hatası'));
+        xhr.open('POST', '/api/medya/upload');
+        xhr.send(formData);
+      });
+
+      if (uploadResult.hata) throw new Error(uploadResult.hata);
+      if (status) status.textContent = 'Video yüklendi, kaydediliyor...';
+      if (progBar) progBar.style.width = '100%';
+
+      // İlk eklenen bağışçı üzerinden video kaydet (grup_id ile tüm gruba yayılır)
+      const videoR = await fetch('/api/admin/videolar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bagisci_id: eklenenIdler[0],
+          organizasyon_id: orgId,
+          baslik: baslik || null,
+          arama_etiketleri: etiket || null,
+          cloudinary_url: uploadResult.url,
+          cloudinary_public_id: uploadResult.public_id,
+          thumbnail_url: uploadResult.thumbnail_url || null,
+          sure: uploadResult.duration || 0,
+          boyut: uploadResult.bytes || 0,
+        })
+      });
+      const videoD = await videoR.json();
+      if (!videoD.ok) throw new Error(videoD.hata || 'Video kayıt hatası');
+
+      toast(
+        `${eklenen} bağışçı eklendi + video ${videoD.grup_sayisi > 1 ? videoD.grup_sayisi + ' hissedara' : ''} yüklendi`,
+        'success', 5000
+      );
+    } else {
+      toast(`${eklenen} bağışçı eklendi — grup oluşturuldu (${doluHisseler.length}/7 hisse)`, 'success');
+    }
+
+    kurbanVideoData = null;
     modalKapat();
     bagiscilarYukle();
-  } catch (e) { toast('Bağlantı hatası', 'error'); }
+    videolarYukle();
+  } catch (e) {
+    toast('Hata: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-save"></i> Kaydet';
+  }
 }
 
 // ─── BAĞIŞÇILAR ───────────────────────────────────────────────────────────────
@@ -722,6 +859,15 @@ async function videolarYukle() {
         <td style="font-weight:600; color:var(--text)">
           ${escHtml(v.bagisci_adi)}
           ${v.hisse_no ? `<div style="font-size:0.72rem; color:var(--text3); margin-top:2px;">${v.hisse_no}. Hisse</div>` : ''}
+          ${v.grup_uyeleri && v.grup_uyeleri.length > 1 ? `
+            <div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:3px;">
+              ${v.grup_uyeleri.map(u => `
+                <span style="font-size:0.68rem; background:var(--bg4); border:1px solid var(--border); border-radius:4px; padding:1px 5px; color:var(--text2);">
+                  ${escHtml(u.hisse_no + '. ')}${escHtml(u.ad)}
+                </span>
+              `).join('')}
+            </div>
+          ` : ''}
         </td>
         <td style="font-size:0.8rem; color:var(--text3)">${escHtml(v.organizasyon_adi || '')}</td>
         <td>

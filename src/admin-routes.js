@@ -218,7 +218,8 @@ router.get('/videolar', adminKontrol, ac(async (req, res) => {
   const { org_id, bagisci_id, q } = req.query;
   const db = await getDb();
   let sql = `
-    SELECT v.*, b.ad as bagisci_adi, b.telefon as bagisci_telefon, b.hisse_no, o.ad as organizasyon_adi
+    SELECT v.*, b.ad as bagisci_adi, b.telefon as bagisci_telefon, b.hisse_no, b.grup_id,
+           o.ad as organizasyon_adi
     FROM videolar v
     JOIN bagiscilar b ON v.bagisci_id = b.id
     JOIN organizasyonlar o ON v.organizasyon_id = o.id
@@ -229,7 +230,20 @@ router.get('/videolar', adminKontrol, ac(async (req, res) => {
   if (bagisci_id) { sql += ' AND v.bagisci_id=?'; params.push(bagisci_id); }
   if (q)          { sql += ' AND (b.ad LIKE ? OR v.baslik LIKE ? OR v.arama_etiketleri LIKE ?)'; params.push(`%${q}%`, `%${q}%`, `%${q}%`); }
   sql += ' ORDER BY v.olusturma DESC';
-  res.json(db.prepare(sql).all(...params));
+  const videolar = db.prepare(sql).all(...params);
+
+  // Her video için grup üyelerini ekle
+  const result = videolar.map(v => {
+    if (v.grup_id) {
+      const grupUyeleri = db.prepare(
+        'SELECT id, ad, hisse_no FROM bagiscilar WHERE grup_id=? AND organizasyon_id=? ORDER BY hisse_no ASC'
+      ).all(v.grup_id, v.organizasyon_id);
+      return { ...v, grup_uyeleri: grupUyeleri };
+    }
+    return { ...v, grup_uyeleri: [] };
+  });
+
+  res.json(result);
 }));
 
 router.post('/videolar', adminKontrol, ac(async (req, res) => {
