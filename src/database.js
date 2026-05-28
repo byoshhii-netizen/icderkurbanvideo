@@ -254,6 +254,8 @@ async function _initDb() {
     "ALTER TABLE bagiscilar ADD COLUMN etiket5 TEXT",
     "ALTER TABLE bagiscilar ADD COLUMN etiket6 TEXT",
     "ALTER TABLE bagiscilar ADD COLUMN etiket7 TEXT",
+    // Grup sistemi: aynı kurbandaki 7 hisse aynı grup_id'yi paylaşır
+    "ALTER TABLE bagiscilar ADD COLUMN grup_id TEXT",
   ];
   migrations.forEach(m => { try { sqlDb.run(m); } catch (_) {} });
 

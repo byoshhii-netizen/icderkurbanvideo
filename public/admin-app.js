@@ -364,9 +364,13 @@ function kurbanEkleModal() {
           <label class="form-label" style="font-size:0.75rem;">Telefon</label>
           <input type="tel" class="form-input" id="hisse${i+1}Tel" placeholder="5XX XXX XX XX">
         </div>
-        <div class="form-group" style="margin:0; grid-column:1/-1;">
-          <label class="form-label" style="font-size:0.75rem;">Etiket Numarası <small style="color:var(--text3)">(arama için)</small></label>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:0.75rem;">Etiket / Sıra No <small style="color:var(--text3)">(arama için)</small></label>
           <input type="text" class="form-input" id="hisse${i+1}Etiket" placeholder="TC, sıra no, vb.">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:0.75rem;">Kimin Adına <small style="color:var(--text3)">(opsiyonel)</small></label>
+          <input type="text" class="form-input" id="hisse${i+1}KiminAdina" placeholder="Vefat eden vb.">
         </div>
       </div>
     </div>
@@ -420,6 +424,7 @@ async function kurbanKaydet() {
       ad: document.getElementById(`hisse${i}Ad`)?.value?.trim() || '',
       telefon: document.getElementById(`hisse${i}Tel`)?.value?.trim() || '',
       etiket: document.getElementById(`hisse${i}Etiket`)?.value?.trim() || '',
+      kiminAdina: document.getElementById(`hisse${i}KiminAdina`)?.value?.trim() || '',
     });
   }
 
@@ -427,8 +432,10 @@ async function kurbanKaydet() {
   const doluHisseler = hisseler.filter(h => h.ad);
   if (doluHisseler.length === 0) { toast('En az 1 hisse doldurulmalı', 'error'); return; }
 
+  // Tüm hisseler için ortak grup_id üret (timestamp + random)
+  const grupId = `grp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
   try {
-    // Her dolu hisse için bağışçı kaydı oluştur
     let eklenen = 0;
     for (let i = 0; i < 7; i++) {
       const h = hisseler[i];
@@ -442,16 +449,19 @@ async function kurbanKaydet() {
           organizasyon_id: orgId,
           hisse_no: i + 1,
           etiket1: h.etiket || null,
-          etiket2: kupe || null,  // küpe/sıra no etiket2'ye
+          etiket2: kupe || null,
+          etiket3: h.kiminAdina || null,
+          grup_id: grupId,   // ← hepsi aynı grup
         })
       });
       const d = await r.json();
       if (d.ok) eklenen++;
     }
-    toast(`${eklenen} bağışçı eklendi (${doluHisseler.length}/7 hisse)`, 'success');
+    toast(`${eklenen} bağışçı eklendi — grup oluşturuldu (${doluHisseler.length}/7 hisse)`, 'success');
     modalKapat();
     bagiscilarYukle();
   } catch (e) { toast('Bağlantı hatası', 'error'); }
+}
 }
 
 // ─── BAĞIŞÇILAR ───────────────────────────────────────────────────────────────
@@ -488,7 +498,8 @@ async function bagiscilarYukle() {
         <td style="font-family:monospace; font-size:0.85rem;">${escHtml(b.telefon || '-')}</td>
         <td style="text-align:center;">
           <span class="badge badge-gray" title="Hisse No" style="font-size:0.75rem;">${b.hisse_no || 1}. Hisse</span>
-          ${(b.etiket1 || b.etiket2) ? `<div style="font-size:0.7rem; color:var(--text3); margin-top:2px;">${[b.etiket1,b.etiket2,b.etiket3].filter(Boolean).join(' · ')}</div>` : ''}
+          ${b.grup_id ? `<div style="font-size:0.68rem; color:var(--accent); margin-top:2px;" title="Grup ID: ${escHtml(b.grup_id)}"><i class="fas fa-link"></i> Grup</div>` : ''}
+          ${(b.etiket1 || b.etiket2 || b.etiket3) ? `<div style="font-size:0.7rem; color:var(--text3); margin-top:2px;">${[b.etiket1,b.etiket2,b.etiket3].filter(Boolean).map(e => escHtml(e)).join(' · ')}</div>` : ''}
         </td>
         <td style="font-size:0.85rem; color:var(--text3)">${escHtml(b.organizasyon_adi || '')}</td>
         <td>
@@ -829,52 +840,59 @@ async function videoBagisciListeYukle() {
       gruplar[hisse].push(b);
     });
 
-    // Hisse no sırasıyla ekle
-    const hisseler = Object.keys(gruplar).sort((a, b) => a - b);
-    if (hisseler.length > 1) {
-      // Birden fazla hisse grubu varsa optgroup kullan
-      hisseler.forEach(hisseNo => {
+    const hisseNoList = Object.keys(gruplar).sort((a, b) => Number(a) - Number(b));
+
+    const ekleOpt = (b, parent) => {
+      const opt = document.createElement('option');
+      opt.value = b.id;
+      opt.dataset.ad = b.ad;
+      opt.dataset.tel = b.telefon || '';
+      opt.dataset.hisse = b.hisse_no || 1;
+      opt.dataset.grupId = b.grup_id || '';
+      // Etiketleri birleştir
+      const etiketler = [b.etiket1,b.etiket2,b.etiket3,b.etiket4,b.etiket5,b.etiket6,b.etiket7]
+        .filter(Boolean).join(', ');
+      opt.dataset.etiketler = etiketler;
+      opt.textContent = `${b.hisse_no || 1}. Hisse — ${b.ad}` + (b.telefon ? ` (${b.telefon})` : '') + (b.grup_id ? ' 🔗' : '');
+      parent.appendChild(opt);
+    };
+
+    if (hisseNoList.length > 1) {
+      hisseNoList.forEach(hisseNo => {
         const grp = document.createElement('optgroup');
         grp.label = `${hisseNo}. Hisse`;
-        gruplar[hisseNo].forEach(b => {
-          const opt = document.createElement('option');
-          opt.value = b.id;
-          opt.dataset.ad = b.ad;
-          opt.dataset.tel = b.telefon || '';
-          opt.dataset.hisse = b.hisse_no || 1;
-          opt.textContent = b.ad + (b.telefon ? ` — ${b.telefon}` : '');
-          grp.appendChild(opt);
-        });
+        gruplar[hisseNo].forEach(b => ekleOpt(b, grp));
         sel.appendChild(grp);
       });
     } else {
-      // Tek grup, düz liste
-      liste.forEach(b => {
-        const opt = document.createElement('option');
-        opt.value = b.id;
-        opt.dataset.ad = b.ad;
-        opt.dataset.tel = b.telefon || '';
-        opt.dataset.hisse = b.hisse_no || 1;
-        opt.textContent = `${b.hisse_no || 1}. Hisse — ${b.ad}` + (b.telefon ? ` (${b.telefon})` : '');
-        sel.appendChild(opt);
-      });
+      liste.forEach(b => ekleOpt(b, sel));
     }
   } catch (e) {
     sel.innerHTML = '<option value="">Yükleme hatası</option>';
   }
 }
 
-// Bağışçı seçilince bilgi göster
+// Bağışçı seçilince bilgi göster + etiket alanını otomatik doldur
 function videoBagisciSecildi() {
   const sel = document.getElementById('videoBagisciInput');
   const info = document.getElementById('seciliBagisciInfo');
   if (!sel || !info) return;
   const opt = sel.options[sel.selectedIndex];
   if (!opt || !opt.value) { info.style.display = 'none'; return; }
+
   document.getElementById('seciliBagisciAd').textContent = opt.dataset.ad || opt.textContent;
   document.getElementById('seciliBagisciTel').textContent = opt.dataset.tel ? `📞 ${opt.dataset.tel}` : '';
   document.getElementById('seciliBagisciHisse').textContent = opt.dataset.hisse ? `• ${opt.dataset.hisse}. Hisse` : '';
+  if (opt.dataset.grupId) {
+    document.getElementById('seciliBagisciHisse').textContent += ' 🔗 Grup — video tüm hissedarlara eklenecek';
+  }
   info.style.display = 'block';
+
+  // Etiket alanını otomatik doldur (boşsa)
+  const etiketInput = document.getElementById('videoEtiketInput');
+  if (etiketInput && !etiketInput.value.trim() && opt.dataset.etiketler) {
+    etiketInput.value = opt.dataset.etiketler;
+  }
 }
 
 // Drag & drop
@@ -966,7 +984,10 @@ async function videoKaydet() {
     });
     const d = await r.json();
     if (d.ok) {
-      toast('Video başarıyla eklendi!', 'success');
+      const mesaj = d.grup_sayisi > 1
+        ? `Video eklendi — ${d.grup_sayisi} hissedar grubuna yayıldı`
+        : 'Video başarıyla eklendi!';
+      toast(mesaj, 'success');
       yuklenenVideoData = null;
       modalKapat();
       videolarYukle();

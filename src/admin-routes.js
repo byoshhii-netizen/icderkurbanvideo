@@ -156,31 +156,36 @@ router.get('/bagiscilar', adminKontrol, ac(async (req, res) => {
 
 router.post('/bagiscilar', adminKontrol, ac(async (req, res) => {
   const { ad, telefon, organizasyon_id, hisse_no,
-          etiket1, etiket2, etiket3, etiket4, etiket5, etiket6, etiket7 } = req.body;
+          etiket1, etiket2, etiket3, etiket4, etiket5, etiket6, etiket7,
+          grup_id } = req.body;
   if (!ad || !organizasyon_id) return res.status(400).json({ hata: 'Ad ve organizasyon gerekli' });
   const db = await getDb();
   const r = db.prepare(`INSERT INTO bagiscilar
-    (ad, telefon, organizasyon_id, hisse_no, etiket1, etiket2, etiket3, etiket4, etiket5, etiket6, etiket7)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    (ad, telefon, organizasyon_id, hisse_no, etiket1, etiket2, etiket3, etiket4, etiket5, etiket6, etiket7, grup_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(ad, normalizeTelefon(telefon), organizasyon_id,
          hisse_no || 1,
          etiket1 || null, etiket2 || null, etiket3 || null, etiket4 || null,
-         etiket5 || null, etiket6 || null, etiket7 || null);
+         etiket5 || null, etiket6 || null, etiket7 || null,
+         grup_id || null);
   res.json({ ok: true, id: r.lastInsertRowid });
 }));
 
 router.put('/bagiscilar/:id', adminKontrol, ac(async (req, res) => {
   const { ad, telefon, organizasyon_id, hisse_no,
-          etiket1, etiket2, etiket3, etiket4, etiket5, etiket6, etiket7 } = req.body;
+          etiket1, etiket2, etiket3, etiket4, etiket5, etiket6, etiket7,
+          grup_id } = req.body;
   const db = await getDb();
   db.prepare(`UPDATE bagiscilar SET
     ad=?, telefon=?, organizasyon_id=?, hisse_no=?,
-    etiket1=?, etiket2=?, etiket3=?, etiket4=?, etiket5=?, etiket6=?, etiket7=?
+    etiket1=?, etiket2=?, etiket3=?, etiket4=?, etiket5=?, etiket6=?, etiket7=?,
+    grup_id=?
     WHERE id=?`)
     .run(ad, normalizeTelefon(telefon), organizasyon_id,
          hisse_no || 1,
          etiket1 || null, etiket2 || null, etiket3 || null, etiket4 || null,
          etiket5 || null, etiket6 || null, etiket7 || null,
+         grup_id || null,
          req.params.id);
   res.json({ ok: true });
 }));
@@ -233,19 +238,47 @@ router.post('/videolar', adminKontrol, ac(async (req, res) => {
   if (!bagisci_id || !cloudinary_url || !cloudinary_public_id)
     return res.status(400).json({ hata: 'Bağışçı ve video URL gerekli' });
   const db = await getDb();
-  const sayac = db.prepare('SELECT COUNT(*) as c FROM videolar WHERE bagisci_id=?').get(bagisci_id);
-  const videoNo = (sayac?.c || 0) + 1;
-  const orgId = organizasyon_id ||
-    db.prepare('SELECT organizasyon_id FROM bagiscilar WHERE id=?').get(bagisci_id)?.organizasyon_id;
-  const r = db.prepare(`
-    INSERT INTO videolar (bagisci_id, organizasyon_id, baslik, arama_etiketleri,
-      cloudinary_url, cloudinary_public_id, thumbnail_url, video_no, sure, boyut)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(bagisci_id, orgId, baslik || null, arama_etiketleri || null,
-         cloudinary_url, cloudinary_public_id, thumbnail_url || null,
-         videoNo, sure || 0, boyut || 0);
-  db.prepare('UPDATE bagiscilar SET video_var=1 WHERE id=?').run(bagisci_id);
-  res.json({ ok: true, id: r.lastInsertRowid, video_no: videoNo });
+
+  // Seçilen bağışçıyı al
+  const bagisci = db.prepare('SELECT * FROM bagiscilar WHERE id=?').get(bagisci_id);
+  if (!bagisci) return res.status(404).json({ hata: 'Bağışçı bulunamadı' });
+
+  const orgId = organizasyon_id || bagisci.organizasyon_id;
+
+  // Gruba dahil tüm bağışçıları bul (grup_id varsa), yoksa sadece seçilen bağışçı
+  let hedefBagiscilar = [bagisci];
+  if (bagisci.grup_id) {
+    hedefBagiscilar = db.prepare(
+      'SELECT * FROM bagiscilar WHERE grup_id=? AND organizasyon_id=?'
+    ).all(bagisci.grup_id, orgId);
+    if (hedefBagiscilar.length === 0) hedefBagiscilar = [bagisci];
+  }
+
+  // Her bağışçıya video kaydı oluştur
+  const eklenenIdler = [];
+  for (const b of hedefBagiscilar) {
+    const sayac = db.prepare('SELECT COUNT(*) as c FROM videolar WHERE bagisci_id=?').get(b.id);
+    const videoNo = (sayac?.c || 0) + 1;
+    const r = db.prepare(`
+      INSERT INTO videolar (bagisci_id, organizasyon_id, baslik, arama_etiketleri,
+        cloudinary_url, cloudinary_public_id, thumbnail_url, video_no, sure, boyut)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(b.id, orgId, baslik || null, arama_etiketleri || null,
+           cloudinary_url, cloudinary_public_id, thumbnail_url || null,
+           videoNo, sure || 0, boyut || 0);
+    db.prepare('UPDATE bagiscilar SET video_var=1 WHERE id=?').run(b.id);
+    eklenenIdler.push(r.lastInsertRowid);
+  }
+
+  res.json({
+    ok: true,
+    id: eklenenIdler[0],
+    video_no: 1,
+    grup_sayisi: hedefBagiscilar.length,
+    mesaj: hedefBagiscilar.length > 1
+      ? `${hedefBagiscilar.length} bağışçıya (grup) video eklendi`
+      : 'Video eklendi'
+  });
 }));
 
 router.put('/videolar/:id', adminKontrol, ac(async (req, res) => {
