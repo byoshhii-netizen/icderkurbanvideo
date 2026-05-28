@@ -728,15 +728,85 @@ async function bagisciKaydet() {
 }
 
 function bagisciDuzenle(id) {
-  // Önce bağışçı bilgilerini çek
-  fetch('/api/admin/bagiscilar?q=&org_id=').then(r => r.json()).then(liste => {
-    // Tüm bağışçılardan bul
-    fetch('/api/admin/bagiscilar').then(r2 => r2.json()).then(tumListe => {
-      const b = tumListe.find(x => x.id === id);
-      if (!b) return;
-      const orgOptions = organizasyonlar.map(o =>
-        `<option value="${o.id}" ${o.id === b.organizasyon_id ? 'selected' : ''}>${escHtml(o.ad)} (${o.yil})</option>`
-      ).join('');
+  // Tüm bağışçıları çek, sonra grup varsa tüm grubu getir
+  fetch('/api/admin/bagiscilar').then(r => r.json()).then(tumListe => {
+    const b = tumListe.find(x => x.id === id);
+    if (!b) return;
+
+    // Grup varsa gruptaki tüm üyeleri al, yoksa sadece bu bağışçı
+    let grupUyeleri = [];
+    if (b.grup_id) {
+      grupUyeleri = tumListe
+        .filter(x => x.grup_id === b.grup_id && x.organizasyon_id === b.organizasyon_id)
+        .sort((a, c) => (a.hisse_no || 1) - (c.hisse_no || 1));
+    }
+
+    const orgOptions = organizasyonlar.map(o =>
+      `<option value="${o.id}" ${o.id === b.organizasyon_id ? 'selected' : ''}>${escHtml(o.ad)} (${o.yil})</option>`
+    ).join('');
+
+    if (grupUyeleri.length > 1) {
+      // ─── GRUP DÜZENLEMESİ ───────────────────────────────────────────────────
+      const hisseSatirlari = grupUyeleri.map(u => `
+        <div style="border:1px solid var(--border); border-radius:8px; padding:12px; background:var(--bg3);">
+          <div style="font-size:0.8rem; font-weight:700; color:var(--accent); margin-bottom:8px;">
+            <i class="fas fa-user"></i> ${u.hisse_no || '?'}. Hisse
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:0.75rem;">Ad Soyad</label>
+              <input type="text" class="form-input" id="grupHisse${u.id}Ad" value="${escHtml(u.ad)}">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:0.75rem;">Telefon</label>
+              <input type="tel" class="form-input" id="grupHisse${u.id}Tel" value="${escHtml(u.telefon || '')}">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:0.75rem;">Etiket 1 <small style="color:var(--text3)">(arama)</small></label>
+              <input type="text" class="form-input" id="grupHisse${u.id}Et1" value="${escHtml(u.etiket1 || '')}">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:0.75rem;">Etiket 2</label>
+              <input type="text" class="form-input" id="grupHisse${u.id}Et2" value="${escHtml(u.etiket2 || '')}">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:0.75rem;">Etiket 3</label>
+              <input type="text" class="form-input" id="grupHisse${u.id}Et3" value="${escHtml(u.etiket3 || '')}">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:0.75rem;">Etiket 4</label>
+              <input type="text" class="form-input" id="grupHisse${u.id}Et4" value="${escHtml(u.etiket4 || '')}">
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      modalGoster(`
+        <div class="modal-header">
+          <div class="modal-title"><i class="fas fa-users" style="color:var(--accent)"></i> Grup Düzenle — ${grupUyeleri.length} Hisse</div>
+          <button class="modal-close" onclick="modalKapat()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" style="padding:20px; max-height:85vh; overflow-y:auto;">
+          <div class="form-group" style="margin-bottom:16px;">
+            <label class="form-label">Organizasyon *</label>
+            <select class="form-select" id="grupOrgInput">${orgOptions}</select>
+          </div>
+          <div style="font-size:0.85rem; font-weight:600; color:var(--text2); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border);">
+            <i class="fas fa-users" style="color:var(--accent)"></i> Hisse Bilgileri
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            ${hisseSatirlari}
+          </div>
+          <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+            <button class="btn btn-ghost" onclick="modalKapat()">İptal</button>
+            <button class="btn btn-primary" onclick="grupGuncelle(${JSON.stringify(grupUyeleri.map(u => u.id))})">
+              <i class="fas fa-save"></i> Tümünü Güncelle
+            </button>
+          </div>
+        </div>
+      `);
+    } else {
+      // ─── TEKİL BAĞIŞÇI DÜZENLEMESİ ─────────────────────────────────────────
       const hisseOptions = [1,2,3,4,5,6,7].map(n =>
         `<option value="${n}" ${(b.hisse_no || 1) == n ? 'selected' : ''}>${n}. Hisse</option>`
       ).join('');
@@ -759,13 +829,12 @@ function bagisciDuzenle(id) {
             <select class="form-select" id="bagisciOrgInput">${orgOptions}</select>
           </div>
           <div class="form-group">
-            <label class="form-label">Hisse No <small style="color:var(--text3)">(7'li kurban için 1-7)</small></label>
+            <label class="form-label">Hisse No</label>
             <select class="form-select" id="bagisciHisseInput">${hisseOptions}</select>
           </div>
           <div style="border-top:1px solid var(--border); margin:14px 0; padding-top:14px;">
             <div style="font-size:0.85rem; font-weight:600; color:var(--text2); margin-bottom:10px;">
               <i class="fas fa-tags" style="color:var(--accent)"></i> Arama Etiketleri
-              <small style="font-weight:400; color:var(--text3)"> — telefon, TC, sıra no vb.</small>
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
               ${[1,2,3,4,5,6,7].map(n => `
@@ -782,8 +851,42 @@ function bagisciDuzenle(id) {
           </div>
         </div>
       `);
-    });
+    }
   });
+}
+
+async function grupGuncelle(idler) {
+  const orgId = document.getElementById('grupOrgInput')?.value;
+  if (!orgId) { toast('Organizasyon seçin', 'error'); return; }
+
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Kaydediliyor...'; }
+
+  try {
+    let guncellenen = 0;
+    for (const id of idler) {
+      const ad = document.getElementById(`grupHisse${id}Ad`)?.value?.trim();
+      const telefon = document.getElementById(`grupHisse${id}Tel`)?.value?.trim();
+      const etiket1 = document.getElementById(`grupHisse${id}Et1`)?.value?.trim() || '';
+      const etiket2 = document.getElementById(`grupHisse${id}Et2`)?.value?.trim() || '';
+      const etiket3 = document.getElementById(`grupHisse${id}Et3`)?.value?.trim() || '';
+      const etiket4 = document.getElementById(`grupHisse${id}Et4`)?.value?.trim() || '';
+      if (!ad) continue;
+      const r = await fetch('/api/admin/bagiscilar/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ad, telefon, organizasyon_id: orgId, etiket1, etiket2, etiket3, etiket4 })
+      });
+      const d = await r.json();
+      if (d.ok) guncellenen++;
+    }
+    toast(`${guncellenen} hisse güncellendi`, 'success');
+    modalKapat();
+    bagiscilarYukle();
+  } catch (e) {
+    toast('Hata: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Tümünü Güncelle'; }
+  }
 }
 
 async function bagisciGuncelle(id) {
