@@ -106,6 +106,10 @@ async function ayarlariYukle() {
         if (durum) durum.textContent = tog.checked ? 'Açık (isim + tel + etiket)' : 'Kapalı (sadece tel/etiket)';
       }
     }
+    if (d.varsayilan_video_basligi !== undefined) {
+      const inp = document.getElementById('varsayilanVideoBaslikInput');
+      if (inp) inp.value = d.varsayilan_video_basligi || '';
+    }
   } catch (e) {}
 }
 
@@ -411,16 +415,6 @@ function kurbanEkleModal() {
           <i class="fas fa-video" style="color:var(--accent)"></i> Video Yükle
           <small style="font-weight:400; color:var(--text3); margin-left:8px;">Tüm hissedarlara otomatik eklenir — opsiyonel</small>
         </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
-          <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:0.78rem;">Video Başlığı <small style="color:var(--text3)">(opsiyonel)</small></label>
-            <input type="text" class="form-input" id="kurbanVideoBaslik" placeholder="örn: Büyükbaş Kurban Kesimi">
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:0.78rem;">Arama Etiketleri <small style="color:var(--text3)">(virgülle)</small></label>
-            <input type="text" class="form-input" id="kurbanVideoEtiket" placeholder="örn: büyükbaş, 2025">
-          </div>
-        </div>
         <div class="upload-area" id="kurbanUploadArea"
           onclick="document.getElementById('kurbanVideoInput').click()"
           ondragover="kurbanDragOver(event)"
@@ -530,13 +524,10 @@ async function kurbanKaydet() {
       const status = document.getElementById('kurbanUploadStatus');
       const prog = document.getElementById('kurbanUploadProgress');
       const progBar = document.getElementById('kurbanUploadProgressBar');
-      const baslik = document.getElementById('kurbanVideoBaslik')?.value?.trim();
-      const etiket = document.getElementById('kurbanVideoEtiket')?.value?.trim();
 
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Video yükleniyor...';
       if (prog) prog.style.display = 'block';
 
-      // Cloudinary'ye yükle
       const formData = new FormData();
       formData.append('video', kurbanVideoData);
 
@@ -562,15 +553,13 @@ async function kurbanKaydet() {
       if (status) status.textContent = 'Video yüklendi, kaydediliyor...';
       if (progBar) progBar.style.width = '100%';
 
-      // İlk eklenen bağışçı üzerinden video kaydet (grup_id ile tüm gruba yayılır)
+      // Başlık ve etiket backend'de otomatik atanır (varsayılan başlık + bağışçı etiketleri)
       const videoR = await fetch('/api/admin/videolar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bagisci_id: eklenenIdler[0],
           organizasyon_id: orgId,
-          baslik: baslik || null,
-          arama_etiketleri: etiket || null,
           cloudinary_url: uploadResult.url,
           cloudinary_public_id: uploadResult.public_id,
           thumbnail_url: uploadResult.thumbnail_url || null,
@@ -929,14 +918,6 @@ function videoEkleModal(bagisciIdOnceden, bagisciAdOnceden) {
       </div>
 
       <div class="form-group">
-        <label class="form-label">Video Başlığı <small style="color:var(--text3)">(opsiyonel)</small></label>
-        <input type="text" class="form-input" id="videoBaslikInput" placeholder="örn: Büyükbaş Kurban Kesimi">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Arama Etiketleri <small style="color:var(--text3)">(virgülle ayırın)</small></label>
-        <input type="text" class="form-input" id="videoEtiketInput" placeholder="örn: ahmet, yılmaz, büyükbaş, 2025">
-      </div>
-      <div class="form-group">
         <label class="form-label">Video Dosyası *</label>
         <div class="upload-area" id="uploadArea" onclick="document.getElementById('videoFileInput').click()" ondragover="dragOver(event)" ondrop="dropVideo(event)">
           <i class="fas fa-cloud-upload-alt"></i>
@@ -1069,8 +1050,6 @@ function videoSecildiDosya(file) {
 async function videoKaydet() {
   const bagisciId = document.getElementById('videoBagisciInput')?.value;
   const orgId = document.getElementById('videoOrgInput')?.value;
-  const baslik = document.getElementById('videoBaslikInput')?.value?.trim();
-  const etiketler = document.getElementById('videoEtiketInput')?.value?.trim();
   if (!bagisciId) { toast('Bağışçı seçin', 'error'); return; }
   if (!yuklenenVideoData) { toast('Video dosyası seçin', 'error'); return; }
 
@@ -1111,15 +1090,13 @@ async function videoKaydet() {
     status.textContent = 'Video yüklendi, kaydediliyor...';
     progressBar.style.width = '100%';
 
-    // DB'ye kaydet
+    // DB'ye kaydet — başlık ve etiket backend'de otomatik atanır
     const r = await fetch('/api/admin/videolar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         bagisci_id: bagisciId,
         organizasyon_id: orgId,
-        baslik: baslik || null,
-        arama_etiketleri: etiketler || null,
         cloudinary_url: uploadResult.url,
         cloudinary_public_id: uploadResult.public_id,
         thumbnail_url: uploadResult.thumbnail_url || null,
@@ -1418,6 +1395,21 @@ async function siteBasligiKaydet() {
     });
     const d = await r.json();
     if (d.ok) toast('Başlık güncellendi', 'success');
+    else toast(d.hata || 'Hata', 'error');
+  } catch (e) { toast('Bağlantı hatası', 'error'); }
+}
+
+async function varsayilanVideoBasligiKaydet() {
+  const baslik = document.getElementById('varsayilanVideoBaslikInput')?.value?.trim();
+  if (!baslik) { toast('Başlık boş olamaz', 'error'); return; }
+  try {
+    const r = await fetch('/api/admin/varsayilan-video-basligi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baslik })
+    });
+    const d = await r.json();
+    if (d.ok) toast('Varsayılan video başlığı güncellendi', 'success');
     else toast(d.hata || 'Hata', 'error');
   } catch (e) { toast('Bağlantı hatası', 'error'); }
 }

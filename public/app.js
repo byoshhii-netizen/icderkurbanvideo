@@ -5,6 +5,7 @@ let aramaTimeout = null;
 let aktifVideo = null;
 let tumVideolar = []; // /video/:id için cache
 let sifreSistemiAktif = false;
+let isimAramaAktif = false; // global ayar
 let dogrulanmisTelefon = null; // oturum boyunca bir kez doğrulama yeterli
 let bekleyenVideo = null;      // şifre onayı beklenen video
 
@@ -102,13 +103,13 @@ async function ayarlariYukle() {
       img.style.display = 'block';
     }
     sifreSistemiAktif = d.sifre_sistemi_aktif === '1';
+    isimAramaAktif = d.isimle_arama_aktif === '1';
 
     // İsimle arama ayarına göre input'u güncelle
-    const isimleArama = d.isimle_arama_aktif === '1';
     const input = document.getElementById('searchInput');
     const hint = document.getElementById('searchHint');
     const aciklama = document.getElementById('heroAciklama');
-    if (isimleArama) {
+    if (isimAramaAktif) {
       input.type = 'text';
       input.placeholder = 'İsim, telefon veya etiket numarası yazın...';
       input.inputMode = '';
@@ -117,8 +118,9 @@ async function ayarlariYukle() {
     } else {
       input.type = 'tel';
       input.placeholder = 'Telefon numaranızı yazın... (05XX XXX XX XX)';
-      input.inputMode = 'tel';
-      if (hint) hint.innerHTML = '<i class="fas fa-info-circle"></i> Kayıtlı telefon numaranızı veya size verilen etiket numarasını girin.';
+      input.inputMode = 'numeric';
+      input.pattern = '[0-9]*';
+      if (hint) hint.innerHTML = '<i class="fas fa-info-circle"></i> Sadece kayıtlı telefon numaranızı girin.';
       if (aciklama) aciklama.textContent = 'Telefon numaranızı yazın, kurban kesim videonuzu izleyin';
     }
   } catch (e) {}
@@ -151,6 +153,22 @@ async function organizasyonlariYukle() {
 async function aramaYap(guncelleUrl = true) {
   const q = document.getElementById('searchInput').value.trim();
   if (!q) { sonuclariGizle(); urlGuncelle(''); return; }
+
+  // İsim araması kapalıyken harf girişini engelle
+  if (!isimAramaAktif) {
+    const sadeceSayi = /^\d+$/.test(q.replace(/[\s\-\+\(\)]/g, ''));
+    if (!sadeceSayi) {
+      const hint = document.getElementById('searchHint');
+      if (hint) {
+        hint.innerHTML = '<i class="fas fa-exclamation-circle" style="color:var(--red,#e53e3e)"></i> Sadece telefon numarası girebilirsiniz.';
+        setTimeout(() => {
+          hint.innerHTML = '<i class="fas fa-info-circle"></i> Sadece kayıtlı telefon numaranızı girin.';
+        }, 2500);
+      }
+      sonuclariGizle();
+      return;
+    }
+  }
 
   const orgId = document.getElementById('orgSelect')?.value || '';
   if (guncelleUrl) urlGuncelle(q);

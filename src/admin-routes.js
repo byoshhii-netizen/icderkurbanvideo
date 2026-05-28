@@ -69,6 +69,15 @@ router.post('/site-basligi', adminKontrol, ac(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ─── VARSAYILAN VİDEO BAŞLIĞI ─────────────────────────────────────────────────
+router.post('/varsayilan-video-basligi', adminKontrol, ac(async (req, res) => {
+  const { baslik } = req.body;
+  if (!baslik) return res.status(400).json({ hata: 'Başlık gerekli' });
+  const db = await getDb();
+  db.prepare("UPDATE sistem_ayarlari SET deger=? WHERE anahtar='varsayilan_video_basligi'").run(baslik);
+  res.json({ ok: true });
+}));
+
 // ─── ŞİFRE SİSTEMİ ───────────────────────────────────────────────────────────
 router.post('/sifre-sistemi', adminKontrol, ac(async (req, res) => {
   const { aktif } = req.body;
@@ -259,6 +268,11 @@ router.post('/videolar', adminKontrol, ac(async (req, res) => {
 
   const orgId = organizasyon_id || bagisci.organizasyon_id;
 
+  // Varsayılan video başlığını ayarlardan al
+  const baslikAyar = db.prepare("SELECT deger FROM sistem_ayarlari WHERE anahtar='varsayilan_video_basligi'").get();
+  const varsayilanBaslik = baslikAyar?.deger || '2026 İÇDER KURBAN ORGANİZASYONU';
+  const videoBaslik = baslik || varsayilanBaslik;
+
   // Gruba dahil tüm bağışçıları bul (grup_id varsa), yoksa sadece seçilen bağışçı
   let hedefBagiscilar = [bagisci];
   if (bagisci.grup_id) {
@@ -269,15 +283,21 @@ router.post('/videolar', adminKontrol, ac(async (req, res) => {
   }
 
   // Her bağışçıya video kaydı oluştur
+  // Etiket: bağışçının kendi etiketleri kullanılır (arama_etiketleri parametresi yok sayılır)
   const eklenenIdler = [];
   for (const b of hedefBagiscilar) {
     const sayac = db.prepare('SELECT COUNT(*) as c FROM videolar WHERE bagisci_id=?').get(b.id);
     const videoNo = (sayac?.c || 0) + 1;
+
+    // Bağışçının etiketlerini birleştir
+    const bagisciEtiketler = [b.etiket1, b.etiket2, b.etiket3, b.etiket4, b.etiket5, b.etiket6, b.etiket7]
+      .filter(Boolean).join(', ');
+
     const r = db.prepare(`
       INSERT INTO videolar (bagisci_id, organizasyon_id, baslik, arama_etiketleri,
         cloudinary_url, cloudinary_public_id, thumbnail_url, video_no, sure, boyut)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(b.id, orgId, baslik || null, arama_etiketleri || null,
+    `).run(b.id, orgId, videoBaslik, bagisciEtiketler || null,
            cloudinary_url, cloudinary_public_id, thumbnail_url || null,
            videoNo, sure || 0, boyut || 0);
     db.prepare('UPDATE bagiscilar SET video_var=1 WHERE id=?').run(b.id);
@@ -412,6 +432,10 @@ router.get('/ayarlar', adminKontrol, ac(async (req, res) => {
   const rows = db.prepare('SELECT anahtar, deger FROM sistem_ayarlari').all();
   const ayarlar = {};
   rows.forEach(r => { ayarlar[r.anahtar] = r.deger; });
+  // varsayılan yoksa fallback
+  if (!ayarlar.varsayilan_video_basligi) {
+    ayarlar.varsayilan_video_basligi = '2026 İÇDER KURBAN ORGANİZASYONU';
+  }
   res.json(ayarlar);
 }));
 

@@ -261,13 +261,14 @@ async function _initDb() {
 
   // Varsayılan ayarlar
   const defaults = [
-    ['admin_sifre',           'icder2025'],
-    ['site_logo_b64',         ''],
-    ['admin_logo_b64',        ''],
-    ['sifre_sistemi_aktif',   '0'],
-    ['site_basligi',          'İÇDER Kurban Videoları'],
-    ['aktif_organizasyon_id', ''],
-    ['isimle_arama_aktif',    '0'],  // 0 = kapalı (sadece telefon/etiket ile arama)
+    ['admin_sifre',              'icder2025'],
+    ['site_logo_b64',            ''],
+    ['admin_logo_b64',           ''],
+    ['sifre_sistemi_aktif',      '0'],
+    ['site_basligi',             'İÇDER Kurban Videoları'],
+    ['aktif_organizasyon_id',    ''],
+    ['isimle_arama_aktif',       '0'],
+    ['varsayilan_video_basligi', '2026 İÇDER KURBAN ORGANİZASYONU'],
   ];
   defaults.forEach(([k, v]) => {
     try { sqlDb.run("INSERT OR IGNORE INTO sistem_ayarlari (anahtar, deger) VALUES (?, ?)", [k, v]); }
