@@ -102,6 +102,25 @@ async function ayarlariYukle() {
       img.style.display = 'block';
     }
     sifreSistemiAktif = d.sifre_sistemi_aktif === '1';
+
+    // İsimle arama ayarına göre input'u güncelle
+    const isimleArama = d.isimle_arama_aktif === '1';
+    const input = document.getElementById('searchInput');
+    const hint = document.getElementById('searchHint');
+    const aciklama = document.getElementById('heroAciklama');
+    if (isimleArama) {
+      input.type = 'text';
+      input.placeholder = 'İsim, telefon veya etiket numarası yazın...';
+      input.inputMode = '';
+      if (hint) hint.innerHTML = '<i class="fas fa-info-circle"></i> İsim, telefon numarası veya etiket numarasıyla arayabilirsiniz.';
+      if (aciklama) aciklama.textContent = 'İsim veya telefon numaranızı yazın, kurban kesim videonuzu izleyin';
+    } else {
+      input.type = 'tel';
+      input.placeholder = 'Telefon numaranızı yazın... (05XX XXX XX XX)';
+      input.inputMode = 'tel';
+      if (hint) hint.innerHTML = '<i class="fas fa-info-circle"></i> Kayıtlı telefon numaranızı veya size verilen etiket numarasını girin.';
+      if (aciklama) aciklama.textContent = 'Telefon numaranızı yazın, kurban kesim videonuzu izleyin';
+    }
   } catch (e) {}
 }
 
@@ -172,7 +191,7 @@ function sonuclariGoster(sonuclar, q) {
 
   if (sonuclar.length === 0) {
     document.getElementById('emptyTitle').textContent = `"${q}" için sonuç bulunamadı`;
-    document.getElementById('emptyDesc').textContent = 'Farklı bir yazım deneyin veya organizasyon seçin';
+    document.getElementById('emptyDesc').textContent = 'Farklı bir numara deneyin veya organizasyon seçin';
     document.getElementById('emptyState').style.display = 'block';
     document.getElementById('resultsSection').style.display = 'none';
     return;

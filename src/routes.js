@@ -105,6 +105,10 @@ router.get('/ara', ac(async (req, res) => {
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
   const ua = req.headers['user-agent'] || '';
 
+  // İsimle arama ayarını oku
+  const isimAramaRow = db.prepare("SELECT deger FROM sistem_ayarlari WHERE anahtar='isimle_arama_aktif'").get();
+  const isimleAramaAktif = isimAramaRow?.deger === '1';
+
   let orgFilter = '';
   let orgParams = [];
   if (org_id) {
@@ -120,6 +124,7 @@ router.get('/ara', ac(async (req, res) => {
 
   const videolar = db.prepare(`
     SELECT v.*, b.ad as bagisci_adi, b.telefon as bagisci_telefon,
+           b.hisse_no, b.etiket1, b.etiket2, b.etiket3, b.etiket4, b.etiket5, b.etiket6, b.etiket7,
            o.ad as organizasyon_adi
     FROM videolar v
     JOIN bagiscilar b ON v.bagisci_id = b.id
@@ -129,18 +134,69 @@ router.get('/ara', ac(async (req, res) => {
   `).all(...orgParams);
 
   const query = q.trim();
+
+  // Telefon normalize (arama sorgusunu da normalize et)
+  function normalizeTelefon(t) {
+    if (!t) return '';
+    let s = String(t).replace(/\D/g, '');
+    if (s.startsWith('90') && s.length > 10) s = s.slice(2);
+    if (s.startsWith('0')) s = s.slice(1);
+    return s;
+  }
+  const queryTelefon = normalizeTelefon(query);
+  const queryRakamMi = /^\d{4,}$/.test(queryTelefon); // en az 4 rakam ise telefon/etiket araması
+
   const skorlu = videolar.map(v => {
-    // Etiketleri virgülle böl, her birini ayrı ayrı kontrol et
-    const etiketler = (v.arama_etiketleri || '').split(',').map(e => e.trim()).filter(Boolean);
-    const etiketSkoru = etiketler.length
-      ? Math.max(...etiketler.map(e => fuzzyScore(query, e)))
+    // 1. Telefon eşleşmesi (tam veya kısmi)
+    let telefonSkoru = 0;
+    if (queryRakamMi) {
+      const dbTel = normalizeTelefon(v.bagisci_telefon);
+      if (dbTel && dbTel === queryTelefon) telefonSkoru = 100;
+      else if (dbTel && (dbTel.includes(queryTelefon) || queryTelefon.includes(dbTel))) telefonSkoru = 85;
+    }
+
+    // 2. Bağışçı etiketleri (etiket1-7) — rakam veya metin olabilir
+    const bagisciEtiketler = [v.etiket1, v.etiket2, v.etiket3, v.etiket4, v.etiket5, v.etiket6, v.etiket7]
+      .filter(Boolean);
+    let bagisciEtiketSkoru = 0;
+    if (bagisciEtiketler.length) {
+      bagisciEtiketSkoru = Math.max(...bagisciEtiketler.map(e => {
+        // Tam eşleşme
+        if (String(e).trim() === query.trim()) return 100;
+        // İçeriyor
+        if (String(e).toLowerCase().includes(query.toLowerCase())) return 90;
+        // Rakam ise normalize karşılaştır
+        if (queryRakamMi) {
+          const eNorm = normalizeTelefon(String(e));
+          if (eNorm && eNorm === queryTelefon) return 100;
+          if (eNorm && eNorm.includes(queryTelefon)) return 85;
+        }
+        return fuzzyScore(query, String(e));
+      }));
+    }
+
+    // 3. Video arama etiketleri (virgülle ayrılmış)
+    const videoEtiketler = (v.arama_etiketleri || '').split(',').map(e => e.trim()).filter(Boolean);
+    const videoEtiketSkoru = videoEtiketler.length
+      ? Math.max(...videoEtiketler.map(e => fuzzyScore(query, e)))
       : 0;
 
-    const alanlar = [v.bagisci_adi, v.baslik, v.bagisci_telefon];
-    const alanSkoru = Math.max(...alanlar.map(a => fuzzyScore(query, a)));
+    // 4. İsim araması — sadece ayar açıksa
+    let isimSkoru = 0;
+    if (isimleAramaAktif) {
+      isimSkoru = Math.max(
+        fuzzyScore(query, v.bagisci_adi),
+        fuzzyScore(query, v.baslik)
+      );
+    }
 
-    // Etiket eşleşmesi biraz daha öncelikli
-    const maxSkor = Math.max(alanSkoru, etiketSkoru > 0 ? etiketSkoru + 5 : 0);
+    // En yüksek skoru al — etiket/telefon eşleşmesi öncelikli
+    const maxSkor = Math.max(
+      telefonSkoru,
+      bagisciEtiketSkoru > 0 ? bagisciEtiketSkoru + 5 : 0,
+      videoEtiketSkoru > 0 ? videoEtiketSkoru + 3 : 0,
+      isimSkoru
+    );
     return { ...v, _skor: maxSkor };
   }).filter(v => v._skor >= 30);
   skorlu.sort((a, b) => b._skor - a._skor);
@@ -170,7 +226,7 @@ router.post('/izleme-log', ac(async (req, res) => {
 // ─── SİTE AYARLARI ────────────────────────────────────────────────────────────
 router.get('/ayarlar', ac(async (req, res) => {
   const db = await getDb();
-  const rows = db.prepare("SELECT anahtar, deger FROM sistem_ayarlari WHERE anahtar IN ('site_logo_b64','site_basligi','sifre_sistemi_aktif')").all();
+  const rows = db.prepare("SELECT anahtar, deger FROM sistem_ayarlari WHERE anahtar IN ('site_logo_b64','site_basligi','sifre_sistemi_aktif','isimle_arama_aktif')").all();
   const ayarlar = {};
   rows.forEach(r => { ayarlar[r.anahtar] = r.deger; });
   res.json(ayarlar);

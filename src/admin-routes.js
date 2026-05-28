@@ -77,6 +77,14 @@ router.post('/sifre-sistemi', adminKontrol, ac(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ─── İSİMLE ARAMA AYARI ──────────────────────────────────────────────────────
+router.post('/isimle-arama', adminKontrol, ac(async (req, res) => {
+  const { aktif } = req.body;
+  const db = await getDb();
+  db.prepare("UPDATE sistem_ayarlari SET deger=? WHERE anahtar='isimle_arama_aktif'").run(aktif ? '1' : '0');
+  res.json({ ok: true });
+}));
+
 // ─── ORGANİZASYONLAR ─────────────────────────────────────────────────────────
 router.get('/organizasyonlar', adminKontrol, ac(async (req, res) => {
   const db = await getDb();
@@ -147,19 +155,33 @@ router.get('/bagiscilar', adminKontrol, ac(async (req, res) => {
 }));
 
 router.post('/bagiscilar', adminKontrol, ac(async (req, res) => {
-  const { ad, telefon, organizasyon_id } = req.body;
+  const { ad, telefon, organizasyon_id, hisse_no,
+          etiket1, etiket2, etiket3, etiket4, etiket5, etiket6, etiket7 } = req.body;
   if (!ad || !organizasyon_id) return res.status(400).json({ hata: 'Ad ve organizasyon gerekli' });
   const db = await getDb();
-  const r = db.prepare('INSERT INTO bagiscilar (ad, telefon, organizasyon_id) VALUES (?, ?, ?)')
-    .run(ad, normalizeTelefon(telefon), organizasyon_id);
+  const r = db.prepare(`INSERT INTO bagiscilar
+    (ad, telefon, organizasyon_id, hisse_no, etiket1, etiket2, etiket3, etiket4, etiket5, etiket6, etiket7)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(ad, normalizeTelefon(telefon), organizasyon_id,
+         hisse_no || 1,
+         etiket1 || null, etiket2 || null, etiket3 || null, etiket4 || null,
+         etiket5 || null, etiket6 || null, etiket7 || null);
   res.json({ ok: true, id: r.lastInsertRowid });
 }));
 
 router.put('/bagiscilar/:id', adminKontrol, ac(async (req, res) => {
-  const { ad, telefon, organizasyon_id } = req.body;
+  const { ad, telefon, organizasyon_id, hisse_no,
+          etiket1, etiket2, etiket3, etiket4, etiket5, etiket6, etiket7 } = req.body;
   const db = await getDb();
-  db.prepare('UPDATE bagiscilar SET ad=?, telefon=?, organizasyon_id=? WHERE id=?')
-    .run(ad, normalizeTelefon(telefon), organizasyon_id, req.params.id);
+  db.prepare(`UPDATE bagiscilar SET
+    ad=?, telefon=?, organizasyon_id=?, hisse_no=?,
+    etiket1=?, etiket2=?, etiket3=?, etiket4=?, etiket5=?, etiket6=?, etiket7=?
+    WHERE id=?`)
+    .run(ad, normalizeTelefon(telefon), organizasyon_id,
+         hisse_no || 1,
+         etiket1 || null, etiket2 || null, etiket3 || null, etiket4 || null,
+         etiket5 || null, etiket6 || null, etiket7 || null,
+         req.params.id);
   res.json({ ok: true });
 }));
 

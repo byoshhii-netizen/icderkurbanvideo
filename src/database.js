@@ -245,6 +245,15 @@ async function _initDb() {
     "ALTER TABLE videolar ADD COLUMN thumbnail_url TEXT",
     "ALTER TABLE videolar ADD COLUMN sure INTEGER DEFAULT 0",
     "ALTER TABLE videolar ADD COLUMN boyut INTEGER DEFAULT 0",
+    // Hisse no (1-7) ve 7 adet arama etiketi
+    "ALTER TABLE bagiscilar ADD COLUMN hisse_no INTEGER DEFAULT 1",
+    "ALTER TABLE bagiscilar ADD COLUMN etiket1 TEXT",
+    "ALTER TABLE bagiscilar ADD COLUMN etiket2 TEXT",
+    "ALTER TABLE bagiscilar ADD COLUMN etiket3 TEXT",
+    "ALTER TABLE bagiscilar ADD COLUMN etiket4 TEXT",
+    "ALTER TABLE bagiscilar ADD COLUMN etiket5 TEXT",
+    "ALTER TABLE bagiscilar ADD COLUMN etiket6 TEXT",
+    "ALTER TABLE bagiscilar ADD COLUMN etiket7 TEXT",
   ];
   migrations.forEach(m => { try { sqlDb.run(m); } catch (_) {} });
 
@@ -256,6 +265,7 @@ async function _initDb() {
     ['sifre_sistemi_aktif',   '0'],
     ['site_basligi',          'İÇDER Kurban Videoları'],
     ['aktif_organizasyon_id', ''],
+    ['isimle_arama_aktif',    '0'],  // 0 = kapalı (sadece telefon/etiket ile arama)
   ];
   defaults.forEach(([k, v]) => {
     try { sqlDb.run("INSERT OR IGNORE INTO sistem_ayarlari (anahtar, deger) VALUES (?, ?)", [k, v]); }

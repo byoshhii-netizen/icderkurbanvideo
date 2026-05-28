@@ -98,6 +98,14 @@ async function ayarlariYukle() {
         document.getElementById('sifreSistemiDurum').textContent = tog.checked ? 'Aktif' : 'Kapalı';
       }
     }
+    if (d.isimle_arama_aktif !== undefined) {
+      const tog = document.getElementById('isimleAramaToggle');
+      if (tog) {
+        tog.checked = d.isimle_arama_aktif === '1';
+        const durum = document.getElementById('isimleAramaDurum');
+        if (durum) durum.textContent = tog.checked ? 'Açık (isim + tel + etiket)' : 'Kapalı (sadece tel/etiket)';
+      }
+    }
   } catch (e) {}
 }
 
@@ -368,6 +376,9 @@ async function bagiscilarYukle() {
         </td>
         <td style="font-weight:600; color:var(--text)">${escHtml(b.ad)}</td>
         <td style="font-family:monospace; font-size:0.85rem;">${escHtml(b.telefon || '-')}</td>
+        <td style="text-align:center;">
+          <span class="badge badge-gray" title="Hisse No">${b.hisse_no || 1}/7</span>
+        </td>
         <td style="font-size:0.85rem; color:var(--text3)">${escHtml(b.organizasyon_adi || '')}</td>
         <td>
           ${b.video_sayisi > 0
@@ -406,7 +417,7 @@ function bagisciEkleModal() {
       <div class="modal-title">Bağışçı Ekle</div>
       <button class="modal-close" onclick="modalKapat()"><i class="fas fa-times"></i></button>
     </div>
-    <div class="modal-body" style="padding:20px;">
+    <div class="modal-body" style="padding:20px; max-height:80vh; overflow-y:auto;">
       <div class="form-group">
         <label class="form-label">Ad Soyad *</label>
         <input type="text" class="form-input" id="bagisciAdInput" placeholder="Ahmet Yılmaz">
@@ -418,6 +429,26 @@ function bagisciEkleModal() {
       <div class="form-group">
         <label class="form-label">Organizasyon *</label>
         <select class="form-select" id="bagisciOrgInput">${orgOptions}</select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Hisse No <small style="color:var(--text3)">(7'li kurban için 1-7)</small></label>
+        <select class="form-select" id="bagisciHisseInput">
+          ${[1,2,3,4,5,6,7].map(n => `<option value="${n}">${n}. Hisse</option>`).join('')}
+        </select>
+      </div>
+      <div style="border-top:1px solid var(--border); margin:14px 0; padding-top:14px;">
+        <div style="font-size:0.85rem; font-weight:600; color:var(--text2); margin-bottom:10px;">
+          <i class="fas fa-tags" style="color:var(--accent)"></i> Arama Etiketleri
+          <small style="font-weight:400; color:var(--text3)"> — telefon, TC, sıra no vb.</small>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          ${[1,2,3,4,5,6,7].map(n => `
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.78rem;">Etiket ${n}</label>
+              <input type="text" class="form-input" id="bagisciEtiket${n}Input" placeholder="örn: 5321234567">
+            </div>
+          `).join('')}
+        </div>
       </div>
       <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
         <button class="btn btn-ghost" onclick="modalKapat()">İptal</button>
@@ -431,12 +462,17 @@ async function bagisciKaydet() {
   const ad = document.getElementById('bagisciAdInput')?.value?.trim();
   const telefon = document.getElementById('bagisciTelInput')?.value?.trim();
   const organizasyon_id = document.getElementById('bagisciOrgInput')?.value;
+  const hisse_no = document.getElementById('bagisciHisseInput')?.value || 1;
+  const etiketler = {};
+  for (let i = 1; i <= 7; i++) {
+    etiketler[`etiket${i}`] = document.getElementById(`bagisciEtiket${i}Input`)?.value?.trim() || '';
+  }
   if (!ad || !organizasyon_id) { toast('Ad ve organizasyon gerekli', 'error'); return; }
   try {
     const r = await fetch('/api/admin/bagiscilar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ad, telefon, organizasyon_id })
+      body: JSON.stringify({ ad, telefon, organizasyon_id, hisse_no: parseInt(hisse_no), ...etiketler })
     });
     const d = await r.json();
     if (d.ok) { toast('Bağışçı eklendi', 'success'); modalKapat(); bagiscilarYukle(); }
@@ -454,12 +490,15 @@ function bagisciDuzenle(id) {
       const orgOptions = organizasyonlar.map(o =>
         `<option value="${o.id}" ${o.id === b.organizasyon_id ? 'selected' : ''}>${escHtml(o.ad)} (${o.yil})</option>`
       ).join('');
+      const hisseOptions = [1,2,3,4,5,6,7].map(n =>
+        `<option value="${n}" ${(b.hisse_no || 1) == n ? 'selected' : ''}>${n}. Hisse</option>`
+      ).join('');
       modalGoster(`
         <div class="modal-header">
           <div class="modal-title">Bağışçı Düzenle</div>
           <button class="modal-close" onclick="modalKapat()"><i class="fas fa-times"></i></button>
         </div>
-        <div class="modal-body" style="padding:20px;">
+        <div class="modal-body" style="padding:20px; max-height:80vh; overflow-y:auto;">
           <div class="form-group">
             <label class="form-label">Ad Soyad *</label>
             <input type="text" class="form-input" id="bagisciAdInput" value="${escHtml(b.ad)}">
@@ -471,6 +510,24 @@ function bagisciDuzenle(id) {
           <div class="form-group">
             <label class="form-label">Organizasyon *</label>
             <select class="form-select" id="bagisciOrgInput">${orgOptions}</select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Hisse No <small style="color:var(--text3)">(7'li kurban için 1-7)</small></label>
+            <select class="form-select" id="bagisciHisseInput">${hisseOptions}</select>
+          </div>
+          <div style="border-top:1px solid var(--border); margin:14px 0; padding-top:14px;">
+            <div style="font-size:0.85rem; font-weight:600; color:var(--text2); margin-bottom:10px;">
+              <i class="fas fa-tags" style="color:var(--accent)"></i> Arama Etiketleri
+              <small style="font-weight:400; color:var(--text3)"> — telefon, TC, sıra no vb.</small>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              ${[1,2,3,4,5,6,7].map(n => `
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label" style="font-size:0.78rem;">Etiket ${n}</label>
+                  <input type="text" class="form-input" id="bagisciEtiket${n}Input" value="${escHtml(b['etiket'+n] || '')}" placeholder="örn: 5321234567">
+                </div>
+              `).join('')}
+            </div>
           </div>
           <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
             <button class="btn btn-ghost" onclick="modalKapat()">İptal</button>
@@ -486,12 +543,17 @@ async function bagisciGuncelle(id) {
   const ad = document.getElementById('bagisciAdInput')?.value?.trim();
   const telefon = document.getElementById('bagisciTelInput')?.value?.trim();
   const organizasyon_id = document.getElementById('bagisciOrgInput')?.value;
+  const hisse_no = document.getElementById('bagisciHisseInput')?.value || 1;
+  const etiketler = {};
+  for (let i = 1; i <= 7; i++) {
+    etiketler[`etiket${i}`] = document.getElementById(`bagisciEtiket${i}Input`)?.value?.trim() || '';
+  }
   if (!ad) { toast('Ad gerekli', 'error'); return; }
   try {
     const r = await fetch('/api/admin/bagiscilar/' + id, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ad, telefon, organizasyon_id })
+      body: JSON.stringify({ ad, telefon, organizasyon_id, hisse_no: parseInt(hisse_no), ...etiketler })
     });
     const d = await r.json();
     if (d.ok) { toast('Güncellendi', 'success'); modalKapat(); bagiscilarYukle(); }
@@ -1039,6 +1101,22 @@ async function sifreSistemiGuncelle(aktif) {
     if (d.ok) {
       document.getElementById('sifreSistemiDurum').textContent = aktif ? 'Aktif' : 'Kapalı';
       toast('Şifre sistemi ' + (aktif ? 'aktif edildi' : 'kapatıldı'), 'success');
+    }
+  } catch (e) { toast('Bağlantı hatası', 'error'); }
+}
+
+async function isimleAramaGuncelle(aktif) {
+  try {
+    const r = await fetch('/api/admin/isimle-arama', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aktif })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      const durum = document.getElementById('isimleAramaDurum');
+      if (durum) durum.textContent = aktif ? 'Açık (isim + tel + etiket)' : 'Kapalı (sadece tel/etiket)';
+      toast('İsimle arama ' + (aktif ? 'açıldı' : 'kapatıldı'), 'success');
     }
   } catch (e) { toast('Bağlantı hatası', 'error'); }
 }

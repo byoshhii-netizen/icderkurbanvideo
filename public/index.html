@@ -23,7 +23,7 @@
 <!-- HERO / ARAMA -->
 <section class="hero">
   <h1>Kurban Videonuzu Bulun</h1>
-  <p>Adınızı yazın, kurban kesim videonuzu izleyin</p>
+  <p id="heroAciklama">Telefon numaranızı yazın, kurban kesim videonuzu izleyin</p>
 
   <div class="org-selector" id="orgSelectorWrap" style="display:none">
     <select id="orgSelect" onchange="aramaYap()">
@@ -33,21 +33,22 @@
 
   <div class="search-box">
     <input
-      type="text"
+      type="tel"
       class="search-input"
       id="searchInput"
-      placeholder="Adınızı yazın... (örn: İsmail Demircan)"
-      autocomplete="off"
+      placeholder="Telefon numaranızı yazın... (05XX XXX XX XX)"
+      autocomplete="tel"
       autocorrect="off"
       spellcheck="false"
+      inputmode="tel"
     >
     <button class="search-btn" onclick="aramaYap()" title="Ara">
       <i class="fas fa-search"></i>
     </button>
   </div>
-  <p class="search-hint">
+  <p class="search-hint" id="searchHint">
     <i class="fas fa-info-circle"></i>
-    Büyük/küçük harf fark etmez. Yanlış yazılsa bile benzer isimler gösterilir.
+    Kayıtlı telefon numaranızı veya size verilen etiket numarasını girin.
   </p>
 </section>
 
