@@ -213,7 +213,7 @@ router.get('/videolar', adminKontrol, ac(async (req, res) => {
   const { org_id, bagisci_id, q } = req.query;
   const db = await getDb();
   let sql = `
-    SELECT v.*, b.ad as bagisci_adi, b.telefon as bagisci_telefon, o.ad as organizasyon_adi
+    SELECT v.*, b.ad as bagisci_adi, b.telefon as bagisci_telefon, b.hisse_no, o.ad as organizasyon_adi
     FROM videolar v
     JOIN bagiscilar b ON v.bagisci_id = b.id
     JOIN organizasyonlar o ON v.organizasyon_id = o.id

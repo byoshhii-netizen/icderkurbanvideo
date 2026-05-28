@@ -344,6 +344,116 @@ async function aktifOrgSec(id) {
   } catch (e) { toast('Bağlantı hatası', 'error'); }
 }
 
+// ─── KURBAN + 7 HİSSE EKLE (icderrr tarzı) ───────────────────────────────────
+function kurbanEkleModal() {
+  const orgOptions = organizasyonlar.map(o =>
+    `<option value="${o.id}">${escHtml(o.ad)} (${o.yil})</option>`
+  ).join('');
+
+  const hisseSatirlari = Array.from({length: 7}, (_, i) => `
+    <div style="border:1px solid var(--border); border-radius:8px; padding:12px; background:var(--bg3);">
+      <div style="font-size:0.8rem; font-weight:700; color:var(--accent); margin-bottom:8px;">
+        <i class="fas fa-user"></i> ${i+1}. Hisse
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:0.75rem;">Ad Soyad</label>
+          <input type="text" class="form-input" id="hisse${i+1}Ad" placeholder="Bağışçı adı">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:0.75rem;">Telefon</label>
+          <input type="tel" class="form-input" id="hisse${i+1}Tel" placeholder="5XX XXX XX XX">
+        </div>
+        <div class="form-group" style="margin:0; grid-column:1/-1;">
+          <label class="form-label" style="font-size:0.75rem;">Etiket Numarası <small style="color:var(--text3)">(arama için)</small></label>
+          <input type="text" class="form-input" id="hisse${i+1}Etiket" placeholder="TC, sıra no, vb.">
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  modalGoster(`
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-plus-circle" style="color:var(--accent)"></i> Kurban + 7 Hisse Ekle</div>
+      <button class="modal-close" onclick="modalKapat()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" style="padding:20px; max-height:85vh; overflow-y:auto;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Organizasyon *</label>
+          <select class="form-select" id="kurbanOrgInput">${orgOptions}</select>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Küpe / Sıra No <small style="color:var(--text3)">(opsiyonel)</small></label>
+          <input type="text" class="form-input" id="kurbanKupeInput" placeholder="örn: K-001">
+        </div>
+      </div>
+
+      <div style="font-size:0.85rem; font-weight:600; color:var(--text2); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border);">
+        <i class="fas fa-users" style="color:var(--accent)"></i> 7 Hisse — Bağışçı Bilgileri
+        <small style="font-weight:400; color:var(--text3); margin-left:8px;">Boş bırakılan hisseler açık kalır</small>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        ${hisseSatirlari}
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+        <button class="btn btn-ghost" onclick="modalKapat()">İptal</button>
+        <button class="btn btn-primary" onclick="kurbanKaydet()">
+          <i class="fas fa-save"></i> Kurbanı Kaydet
+        </button>
+      </div>
+    </div>
+  `);
+}
+
+async function kurbanKaydet() {
+  const orgId = document.getElementById('kurbanOrgInput')?.value;
+  const kupe = document.getElementById('kurbanKupeInput')?.value?.trim();
+  if (!orgId) { toast('Organizasyon seçin', 'error'); return; }
+
+  // Hisseleri topla
+  const hisseler = [];
+  for (let i = 1; i <= 7; i++) {
+    hisseler.push({
+      ad: document.getElementById(`hisse${i}Ad`)?.value?.trim() || '',
+      telefon: document.getElementById(`hisse${i}Tel`)?.value?.trim() || '',
+      etiket: document.getElementById(`hisse${i}Etiket`)?.value?.trim() || '',
+    });
+  }
+
+  // En az 1 hisse dolu olmalı
+  const doluHisseler = hisseler.filter(h => h.ad);
+  if (doluHisseler.length === 0) { toast('En az 1 hisse doldurulmalı', 'error'); return; }
+
+  try {
+    // Her dolu hisse için bağışçı kaydı oluştur
+    let eklenen = 0;
+    for (let i = 0; i < 7; i++) {
+      const h = hisseler[i];
+      if (!h.ad) continue;
+      const r = await fetch('/api/admin/bagiscilar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ad: h.ad,
+          telefon: h.telefon || null,
+          organizasyon_id: orgId,
+          hisse_no: i + 1,
+          etiket1: h.etiket || null,
+          etiket2: kupe || null,  // küpe/sıra no etiket2'ye
+        })
+      });
+      const d = await r.json();
+      if (d.ok) eklenen++;
+    }
+    toast(`${eklenen} bağışçı eklendi (${doluHisseler.length}/7 hisse)`, 'success');
+    modalKapat();
+    bagiscilarYukle();
+  } catch (e) { toast('Bağlantı hatası', 'error'); }
+}
+
 // ─── BAĞIŞÇILAR ───────────────────────────────────────────────────────────────
 async function bagiscilarYukle() {
   const orgId = document.getElementById('bagisciOrgFilter')?.value || '';
@@ -377,7 +487,8 @@ async function bagiscilarYukle() {
         <td style="font-weight:600; color:var(--text)">${escHtml(b.ad)}</td>
         <td style="font-family:monospace; font-size:0.85rem;">${escHtml(b.telefon || '-')}</td>
         <td style="text-align:center;">
-          <span class="badge badge-gray" title="Hisse No">${b.hisse_no || 1}/7</span>
+          <span class="badge badge-gray" title="Hisse No" style="font-size:0.75rem;">${b.hisse_no || 1}. Hisse</span>
+          ${(b.etiket1 || b.etiket2) ? `<div style="font-size:0.7rem; color:var(--text3); margin-top:2px;">${[b.etiket1,b.etiket2,b.etiket3].filter(Boolean).join(' · ')}</div>` : ''}
         </td>
         <td style="font-size:0.85rem; color:var(--text3)">${escHtml(b.organizasyon_adi || '')}</td>
         <td>
@@ -598,7 +709,10 @@ async function videolarYukle() {
             : `<div style="width:80px; height:50px; background:var(--bg4); border-radius:6px; display:flex; align-items:center; justify-content:center; color:var(--text3);"><i class="fas fa-video"></i></div>`
           }
         </td>
-        <td style="font-weight:600; color:var(--text)">${escHtml(v.bagisci_adi)}</td>
+        <td style="font-weight:600; color:var(--text)">
+          ${escHtml(v.bagisci_adi)}
+          ${v.hisse_no ? `<div style="font-size:0.72rem; color:var(--text3); margin-top:2px;">${v.hisse_no}. Hisse</div>` : ''}
+        </td>
         <td style="font-size:0.8rem; color:var(--text3)">${escHtml(v.organizasyon_adi || '')}</td>
         <td>
           <div style="font-size:0.85rem;">${escHtml(v.baslik || '-')}</div>
@@ -633,20 +747,31 @@ function videoEkleModal(bagisciIdOnceden, bagisciAdOnceden) {
   ).join('');
   modalGoster(`
     <div class="modal-header">
-      <div class="modal-title">Video Ekle</div>
+      <div class="modal-title"><i class="fas fa-video" style="color:var(--accent)"></i> Video Ekle</div>
       <button class="modal-close" onclick="modalKapat()"><i class="fas fa-times"></i></button>
     </div>
-    <div class="modal-body" style="padding:20px;">
-      <div class="form-group">
-        <label class="form-label">Organizasyon *</label>
-        <select class="form-select" id="videoOrgInput" onchange="videoBagisciListeYukle()">${orgOptions}</select>
+    <div class="modal-body" style="padding:20px; max-height:85vh; overflow-y:auto;">
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:4px;">
+        <div class="form-group">
+          <label class="form-label">Organizasyon *</label>
+          <select class="form-select" id="videoOrgInput" onchange="videoBagisciListeYukle()">${orgOptions}</select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Bağışçı / Hisse *</label>
+          <select class="form-select" id="videoBagisciInput" onchange="videoBagisciSecildi()">
+            <option value="">Yükleniyor...</option>
+          </select>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Bağışçı *</label>
-        <select class="form-select" id="videoBagisciInput">
-          <option value="">Önce organizasyon seçin</option>
-        </select>
+
+      <!-- Seçilen bağışçı bilgisi -->
+      <div id="seciliBagisciInfo" style="display:none; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:0.85rem;">
+        <span id="seciliBagisciAd" style="font-weight:600; color:var(--accent);"></span>
+        <span id="seciliBagisciTel" style="color:var(--text3); margin-left:8px;"></span>
+        <span id="seciliBagisciHisse" style="color:var(--text3); margin-left:8px;"></span>
       </div>
+
       <div class="form-group">
         <label class="form-label">Video Başlığı <small style="color:var(--text3)">(opsiyonel)</small></label>
         <input type="text" class="form-input" id="videoBaslikInput" placeholder="örn: Büyükbaş Kurban Kesimi">
@@ -677,20 +802,15 @@ function videoEkleModal(bagisciIdOnceden, bagisciAdOnceden) {
     </div>
   `);
 
-  // Eğer bağışçı önceden seçiliyse
-  if (bagisciIdOnceden) {
-    setTimeout(() => {
-      videoBagisciListeYukle().then(() => {
-        const sel = document.getElementById('videoBagisciInput');
-        if (sel) sel.value = bagisciIdOnceden;
-      });
-    }, 100);
-  } else {
-    videoBagisciListeYukle();
-  }
+  videoBagisciListeYukle().then(() => {
+    if (bagisciIdOnceden) {
+      const sel = document.getElementById('videoBagisciInput');
+      if (sel) { sel.value = bagisciIdOnceden; videoBagisciSecildi(); }
+    }
+  });
 }
 
-// Bağışçı listesini organizasyona göre yükle
+// Bağışçı listesini organizasyona göre yükle — hisse no ile birlikte
 async function videoBagisciListeYukle() {
   const orgId = document.getElementById('videoOrgInput')?.value;
   const sel = document.getElementById('videoBagisciInput');
@@ -700,15 +820,61 @@ async function videoBagisciListeYukle() {
     const r = await fetch('/api/admin/bagiscilar?org_id=' + (orgId || ''));
     const liste = await r.json();
     sel.innerHTML = '<option value="">Bağışçı seçin</option>';
+
+    // Hisse no'ya göre grupla
+    const gruplar = {};
     liste.forEach(b => {
-      const opt = document.createElement('option');
-      opt.value = b.id;
-      opt.textContent = b.ad + (b.telefon ? ` (${b.telefon})` : '');
-      sel.appendChild(opt);
+      const hisse = b.hisse_no || 1;
+      if (!gruplar[hisse]) gruplar[hisse] = [];
+      gruplar[hisse].push(b);
     });
+
+    // Hisse no sırasıyla ekle
+    const hisseler = Object.keys(gruplar).sort((a, b) => a - b);
+    if (hisseler.length > 1) {
+      // Birden fazla hisse grubu varsa optgroup kullan
+      hisseler.forEach(hisseNo => {
+        const grp = document.createElement('optgroup');
+        grp.label = `${hisseNo}. Hisse`;
+        gruplar[hisseNo].forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b.id;
+          opt.dataset.ad = b.ad;
+          opt.dataset.tel = b.telefon || '';
+          opt.dataset.hisse = b.hisse_no || 1;
+          opt.textContent = b.ad + (b.telefon ? ` — ${b.telefon}` : '');
+          grp.appendChild(opt);
+        });
+        sel.appendChild(grp);
+      });
+    } else {
+      // Tek grup, düz liste
+      liste.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id;
+        opt.dataset.ad = b.ad;
+        opt.dataset.tel = b.telefon || '';
+        opt.dataset.hisse = b.hisse_no || 1;
+        opt.textContent = `${b.hisse_no || 1}. Hisse — ${b.ad}` + (b.telefon ? ` (${b.telefon})` : '');
+        sel.appendChild(opt);
+      });
+    }
   } catch (e) {
     sel.innerHTML = '<option value="">Yükleme hatası</option>';
   }
+}
+
+// Bağışçı seçilince bilgi göster
+function videoBagisciSecildi() {
+  const sel = document.getElementById('videoBagisciInput');
+  const info = document.getElementById('seciliBagisciInfo');
+  if (!sel || !info) return;
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt || !opt.value) { info.style.display = 'none'; return; }
+  document.getElementById('seciliBagisciAd').textContent = opt.dataset.ad || opt.textContent;
+  document.getElementById('seciliBagisciTel').textContent = opt.dataset.tel ? `📞 ${opt.dataset.tel}` : '';
+  document.getElementById('seciliBagisciHisse').textContent = opt.dataset.hisse ? `• ${opt.dataset.hisse}. Hisse` : '';
+  info.style.display = 'block';
 }
 
 // Drag & drop
