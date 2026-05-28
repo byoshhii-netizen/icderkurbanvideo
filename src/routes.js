@@ -146,6 +146,46 @@ router.get('/ara', ac(async (req, res) => {
   const queryTelefon = normalizeTelefon(query);
   const queryRakamMi = /^\d{4,}$/.test(queryTelefon); // en az 4 rakam ise telefon/etiket araması
 
+  // İsim araması kapalıyken: sadece rakam/etiket araması — isim araması tamamen engellenir
+  // Rakam değilse ve isim araması da kapalıysa hiç sonuç dönme
+  if (!isimleAramaAktif && !queryRakamMi) {
+    // Etiket araması için metin de olabilir (sıra no, TC gibi), ama fuzzy isim araması yapılmaz
+    // Sadece tam/kısmi etiket eşleşmesi kontrol edilir
+    const etiketSonuclar = videolar.map(v => {
+      const bagisciEtiketler = [v.etiket1, v.etiket2, v.etiket3, v.etiket4, v.etiket5, v.etiket6, v.etiket7]
+        .filter(Boolean);
+      let etiketSkoru = 0;
+      if (bagisciEtiketler.length) {
+        etiketSkoru = Math.max(...bagisciEtiketler.map(e => {
+          if (String(e).trim().toLowerCase() === query.trim().toLowerCase()) return 100;
+          if (String(e).toLowerCase().includes(query.toLowerCase())) return 90;
+          return 0; // isim araması kapalıyken fuzzy etiket eşleşmesi yok
+        }));
+      }
+      const videoEtiketler = (v.arama_etiketleri || '').split(',').map(e => e.trim()).filter(Boolean);
+      const videoEtiketSkoru = videoEtiketler.length
+        ? Math.max(...videoEtiketler.map(e => {
+            if (e.toLowerCase() === query.toLowerCase()) return 100;
+            if (e.toLowerCase().includes(query.toLowerCase())) return 90;
+            return 0;
+          }))
+        : 0;
+      const maxSkor = Math.max(
+        etiketSkoru > 0 ? etiketSkoru + 5 : 0,
+        videoEtiketSkoru > 0 ? videoEtiketSkoru + 3 : 0
+      );
+      return { ...v, _skor: maxSkor };
+    }).filter(v => v._skor >= 90); // sadece tam/kısmi eşleşme — fuzzy yok
+    etiketSonuclar.sort((a, b) => b._skor - a._skor);
+
+    try {
+      db.prepare('INSERT INTO izleme_loglari (video_id, bagisci_id, aranan_isim, ip_adresi, user_agent) VALUES (NULL, NULL, ?, ?, ?)')
+        .run(query, ip, ua);
+    } catch (_) {}
+
+    return res.json({ sonuclar: etiketSonuclar.slice(0, 50) });
+  }
+
   const skorlu = videolar.map(v => {
     // 1. Telefon eşleşmesi (tam veya kısmi)
     let telefonSkoru = 0;
