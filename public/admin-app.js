@@ -462,7 +462,6 @@ async function kurbanKaydet() {
     bagiscilarYukle();
   } catch (e) { toast('Bağlantı hatası', 'error'); }
 }
-}
 
 // ─── BAĞIŞÇILAR ───────────────────────────────────────────────────────────────
 async function bagiscilarYukle() {
