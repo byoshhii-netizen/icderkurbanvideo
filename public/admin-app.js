@@ -1795,12 +1795,17 @@ async function goruntulenmeSifirla() {
 }
 
 async function bagisciListesiYazdir() {
-  const orgId = document.getElementById('yazdirilacakOrgInput')?.value || '';
+  const orgId = document.getElementById('bagisciOrgFilter')?.value || '';
+  const videoDurum = document.getElementById('bagisciVideoDurum')?.value || '';
+  const q = document.getElementById('bagisciArama')?.value?.trim() || '';
   toast('Liste hazırlanıyor...', 'info');
 
   try {
     const params = new URLSearchParams();
     if (orgId) params.set('org_id', orgId);
+    if (q) params.set('q', q);
+    if (videoDurum === 'var') params.set('video_durum', 'var');
+    if (videoDurum === 'yok') params.set('video_durum', 'yok');
     const r = await fetch('/api/admin/bagiscilar?' + params.toString());
     const bagiscilar = await r.json();
 
