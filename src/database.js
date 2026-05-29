@@ -256,6 +256,9 @@ async function _initDb() {
     "ALTER TABLE bagiscilar ADD COLUMN etiket7 TEXT",
     // Grup sistemi: aynı kurbandaki 7 hisse aynı grup_id'yi paylaşır
     "ALTER TABLE bagiscilar ADD COLUMN grup_id TEXT",
+    // SMS gönderildi takibi
+    "ALTER TABLE bagiscilar ADD COLUMN sms_gonderildi INTEGER DEFAULT 0",
+    "ALTER TABLE bagiscilar ADD COLUMN sms_tarihi DATETIME",
   ];
   migrations.forEach(m => { try { sqlDb.run(m); } catch (_) {} });
 

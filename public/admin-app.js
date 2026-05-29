@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let aktifSayfa = 'dashboard';
@@ -591,6 +591,7 @@ async function bagiscilarYukle() {
   const videoDurum = document.getElementById('bagisciVideoDurum')?.value || '';
   const q = document.getElementById('bagisciArama')?.value?.trim() || '';
   const grupTur = document.getElementById('bagisciGrupTur')?.value || ''; // 'tumu' | 'gruplu' | 'tekil'
+  const smsDurum = document.getElementById('bagisciSmsDurum')?.value || '';
   const tbody = document.getElementById('bagisciTableBody');
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px;"><div class="spinner" style="margin:auto;"></div></td></tr>';
@@ -608,6 +609,13 @@ async function bagiscilarYukle() {
       bagiscilar = bagiscilar.filter(b => !!b.grup_id);
     } else if (grupTur === 'tekil') {
       bagiscilar = bagiscilar.filter(b => !b.grup_id);
+    }
+
+    // SMS filtresi (frontend'de)
+    if (smsDurum === 'gonderildi') {
+      bagiscilar = bagiscilar.filter(b => b.sms_gonderildi);
+    } else if (smsDurum === 'bekliyor') {
+      bagiscilar = bagiscilar.filter(b => !b.sms_gonderildi);
     }
 
     if (bagiscilar.length === 0) {
@@ -659,7 +667,12 @@ async function bagiscilarYukle() {
       grup.forEach((b, idx) => {
         const isLast = idx === grup.length - 1;
         const tr = document.createElement('tr');
-        tr.className = b.video_var ? 'bagisci-row-green' : 'bagisci-row-red';
+        // Satır rengi: SMS gönderildi + video var = parlak yeşil, sadece video var = normal yeşil, video yok = kırmızı
+        if (b.sms_gonderildi && b.video_var) {
+          tr.className = 'bagisci-row-sms-ok';
+        } else {
+          tr.className = b.video_var ? 'bagisci-row-green' : 'bagisci-row-red';
+        }
         tr.style.cssText = `border-left:3px solid ${renk}; ${isLast ? 'border-bottom:2px solid ' + renk + '40;' : ''}`;
         tr.innerHTML = _bagisciSatirHtml(b);
         tbody.appendChild(tr);
@@ -674,7 +687,11 @@ async function bagiscilarYukle() {
     // Tekil bağışçılar
     tekiller.forEach(b => {
       const tr = document.createElement('tr');
-      tr.className = b.video_var ? 'bagisci-row-green' : 'bagisci-row-red';
+      if (b.sms_gonderildi && b.video_var) {
+        tr.className = 'bagisci-row-sms-ok';
+      } else {
+        tr.className = b.video_var ? 'bagisci-row-green' : 'bagisci-row-red';
+      }
       tr.innerHTML = _bagisciSatirHtml(b);
       tbody.appendChild(tr);
     });
@@ -685,12 +702,34 @@ async function bagiscilarYukle() {
 }
 
 function _bagisciSatirHtml(b) {
+  // Video durumu — belirgin gösterim
+  const videoDurumHtml = b.video_var
+    ? `<div class="durum-kutu durum-video-var">
+        <i class="fas fa-check-circle"></i>
+        <span>Video Var</span>
+       </div>`
+    : `<div class="durum-kutu durum-video-yok">
+        <i class="fas fa-times-circle"></i>
+        <span>Video Yok</span>
+       </div>`;
+
+  // SMS durumu — belirgin gösterim
+  const smsDurumHtml = b.sms_gonderildi
+    ? `<div class="durum-kutu durum-sms-var">
+        <i class="fas fa-check-circle"></i>
+        <span>SMS Gönderildi</span>
+       </div>`
+    : `<div class="durum-kutu durum-sms-yok">
+        <i class="fas fa-clock"></i>
+        <span>SMS Bekliyor</span>
+       </div>`;
+
   return `
     <td>
-      ${b.video_var
-        ? '<span class="dot-green"></span><span class="badge badge-green" style="font-size:0.7rem;">Video Var</span>'
-        : '<span class="dot-red"></span><span class="badge badge-red" style="font-size:0.7rem;">Video Yok</span>'
-      }
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        ${videoDurumHtml}
+        ${smsDurumHtml}
+      </div>
     </td>
     <td style="font-weight:600; color:var(--text)">${escHtml(b.ad)}</td>
     <td style="font-family:monospace; font-size:0.85rem;">${escHtml(b.telefon || '-')}</td>
@@ -712,10 +751,21 @@ function _bagisciSatirHtml(b) {
       }
     </td>
     <td>
-      <div style="display:flex; gap:6px;">
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
         <button class="btn btn-ghost btn-sm btn-icon" onclick="bagisciDuzenle(${b.id})" title="Düzenle"><i class="fas fa-edit"></i></button>
         <button class="btn btn-primary btn-sm" onclick="bagisciVideoEkle(${b.id}, '${escHtml(b.ad)}')" title="Video Ekle">
           <i class="fas fa-plus"></i> Video
+        </button>
+        <button
+          class="btn btn-sm sms-btn ${b.sms_gonderildi ? 'sms-gonderildi' : 'sms-bekliyor'}"
+          id="sms-btn-${b.id}"
+          onclick="smsDurumToggle(${b.id}, ${b.sms_gonderildi ? 1 : 0})"
+          title="${b.sms_gonderildi ? 'SMS gönderildi — geri al' : 'SMS gönderildi olarak işaretle'}"
+        >
+          ${b.sms_gonderildi
+            ? '<i class="fas fa-check-circle"></i> SMS Gönderildi'
+            : '<i class="fas fa-sms"></i> SMS Gönder'
+          }
         </button>
         <button class="btn btn-danger btn-sm btn-icon" onclick="bagisciSil(${b.id})" title="Sil"><i class="fas fa-trash"></i></button>
       </div>
@@ -1111,6 +1161,48 @@ async function bagisciGuncelle(id) {
     if (d.ok) { toast('Güncellendi', 'success'); modalKapat(); bagiscilarYukle(); }
     else toast(d.hata || 'Hata', 'error');
   } catch (e) { toast('Bağlantı hatası', 'error'); }
+}
+
+async function smsDurumToggle(bagisciId, mevcutDurum) {
+  const yeniDurum = mevcutDurum ? 0 : 1;
+  const btn = document.getElementById('sms-btn-' + bagisciId);
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  }
+  try {
+    const r = await fetch('/api/admin/bagiscilar/' + bagisciId + '/sms-gonderildi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aktif: yeniDurum === 1 })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      if (btn) {
+        btn.disabled = false;
+        btn.dataset.durum = yeniDurum;
+        btn.onclick = () => smsDurumToggle(bagisciId, yeniDurum);
+        if (yeniDurum === 1) {
+          btn.className = 'btn btn-sm sms-btn sms-gonderildi';
+          btn.title = 'SMS gönderildi — geri al';
+          btn.innerHTML = '<i class="fas fa-check-circle"></i> SMS Gönderildi';
+          btn.classList.add('sms-pulse');
+          setTimeout(() => btn.classList.remove('sms-pulse'), 600);
+        } else {
+          btn.className = 'btn btn-sm sms-btn sms-bekliyor';
+          btn.title = 'SMS gönderildi olarak işaretle';
+          btn.innerHTML = '<i class="fas fa-sms"></i> SMS Gönder';
+        }
+      }
+      toast(yeniDurum === 1 ? 'SMS gönderildi olarak işaretlendi' : 'SMS durumu geri alındı', 'success');
+    } else {
+      if (btn) { btn.disabled = false; }
+      toast(d.hata || 'Hata', 'error');
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; }
+    toast('Bağlantı hatası', 'error');
+  }
 }
 
 async function bagisciSil(id) {
@@ -1797,6 +1889,8 @@ async function goruntulenmeSifirla() {
 async function bagisciListesiYazdir() {
   const orgId = document.getElementById('bagisciOrgFilter')?.value || '';
   const videoDurum = document.getElementById('bagisciVideoDurum')?.value || '';
+  const smsDurum = document.getElementById('bagisciSmsDurum')?.value || '';
+  const grupTur = document.getElementById('bagisciGrupTur')?.value || '';
   const q = document.getElementById('bagisciArama')?.value?.trim() || '';
   toast('Liste hazırlanıyor...', 'info');
 
@@ -1807,16 +1901,32 @@ async function bagisciListesiYazdir() {
     if (videoDurum === 'var') params.set('video_durum', 'var');
     if (videoDurum === 'yok') params.set('video_durum', 'yok');
     const r = await fetch('/api/admin/bagiscilar?' + params.toString());
-    const bagiscilar = await r.json();
+    let bagiscilar = await r.json();
+
+    // Frontend filtreleri
+    if (grupTur === 'gruplu') bagiscilar = bagiscilar.filter(b => !!b.grup_id);
+    else if (grupTur === 'tekil') bagiscilar = bagiscilar.filter(b => !b.grup_id);
+    if (smsDurum === 'gonderildi') bagiscilar = bagiscilar.filter(b => b.sms_gonderildi);
+    else if (smsDurum === 'bekliyor') bagiscilar = bagiscilar.filter(b => !b.sms_gonderildi);
 
     if (bagiscilar.length === 0) { toast('Bağışçı bulunamadı', 'error'); return; }
 
-    // Org adını bul
     const orgAd = orgId
       ? (organizasyonlar.find(o => String(o.id) === String(orgId))?.ad || '') + ' — '
       : '';
 
     const tarih = new Date().toLocaleDateString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric' });
+
+    // Filtre açıklaması
+    const filtreler = [];
+    if (videoDurum === 'var') filtreler.push('Video Var');
+    else if (videoDurum === 'yok') filtreler.push('Video Yok');
+    if (smsDurum === 'gonderildi') filtreler.push('SMS Gönderildi');
+    else if (smsDurum === 'bekliyor') filtreler.push('SMS Bekliyor');
+    if (grupTur === 'gruplu') filtreler.push('7li Hisseler');
+    else if (grupTur === 'tekil') filtreler.push('Tekil');
+    if (q) filtreler.push(`Arama: "${q}"`);
+    const filtreAciklama = filtreler.length > 0 ? ' · Filtre: ' + filtreler.join(', ') : '';
 
     // Grupları ve tekilleri ayır
     const gruplar = {};
@@ -1836,21 +1946,32 @@ async function bagisciListesiYazdir() {
     // Gruplar
     Object.values(gruplar).forEach(grup => {
       grup.sort((a, c) => (a.hisse_no || 1) - (c.hisse_no || 1));
+      const grupBoyutu = grup.length;
       grup.forEach(b => {
         const etiketChipler = [b.etiket1, b.etiket2, b.etiket3, b.etiket4, b.etiket5, b.etiket6, b.etiket7]
           .filter(Boolean)
           .map(e => `<span class="etiket-chip">${escHtml(e)}</span>`)
-          .join('') || '<span style="color:#9ca3af">—</span>';
+          .join('') || '<span style="color:#5a8570">—</span>';
+
+        // Satır sınıfı: SMS + video = parlak yeşil, sadece video = normal yeşil, video yok = kırmızı
+        let satirSinif = 'video-yok';
+        if (b.sms_gonderildi && b.video_var) satirSinif = 'sms-ve-video-var';
+        else if (b.video_var) satirSinif = 'video-var';
+
         satirlar += `
-          <tr class="${b.video_var ? 'video-var' : 'video-yok'}">
-            <td class="sira">${sira++}</td>
-            <td class="ad">${escHtml(b.ad)}</td>
-            <td class="tel">${escHtml(b.telefon || '—')}</td>
-            <td><span class="hisse-badge">${b.hisse_no || 1}. Hisse</span></td>
+          <tr class="${satirSinif}">
+            <td class="col-sira">${sira++}</td>
+            <td class="col-ad">${escHtml(b.ad)}</td>
+            <td class="col-tel">${escHtml(b.telefon || '—')}</td>
+            <td>
+              <span class="hisse-badge">${b.hisse_no || 1}. Hisse</span>
+              <span class="grup-badge">${grupBoyutu} Hisseli</span>
+            </td>
             <td>${etiketChipler}</td>
-            <td style="font-size:10px;color:#6b7280;">${escHtml(b.organizasyon_adi || '')}</td>
-            <td><span class="video-badge ${b.video_var ? 'var' : 'yok'}">${b.video_var ? '✅ Var' : '❌ Yok'}</span></td>
+            <td style="font-size:10px;color:#5a8570;">${escHtml(b.organizasyon_adi || '')}</td>
+            <td><span class="video-badge ${b.video_var ? 'var' : 'yok'}">${b.video_var ? '✓ Var' : '✗ Yok'}</span></td>
             <td><span class="video-sayi ${(b.video_sayisi || 0) === 0 ? 'sifir' : ''}">${b.video_sayisi || 0}</span></td>
+            <td><span class="sms-badge-print ${b.sms_gonderildi ? 'sms-var' : 'sms-yok'}">${b.sms_gonderildi ? '✓ Gönderildi' : '— Bekliyor'}</span></td>
           </tr>`;
       });
     });
@@ -1860,250 +1981,258 @@ async function bagisciListesiYazdir() {
       const etiketChipler = [b.etiket1, b.etiket2, b.etiket3, b.etiket4, b.etiket5, b.etiket6, b.etiket7]
         .filter(Boolean)
         .map(e => `<span class="etiket-chip">${escHtml(e)}</span>`)
-        .join('') || '<span style="color:#9ca3af">—</span>';
+        .join('') || '<span style="color:#5a8570">—</span>';
+
+      let satirSinif = 'video-yok';
+      if (b.sms_gonderildi && b.video_var) satirSinif = 'sms-ve-video-var';
+      else if (b.video_var) satirSinif = 'video-var';
+
       satirlar += `
-        <tr class="${b.video_var ? 'video-var' : 'video-yok'}">
-          <td class="sira">${sira++}</td>
-          <td class="ad">${escHtml(b.ad)}</td>
-          <td class="tel">${escHtml(b.telefon || '—')}</td>
-          <td><span style="color:#9ca3af;font-size:10px;">—</span></td>
+        <tr class="${satirSinif}">
+          <td class="col-sira">${sira++}</td>
+          <td class="col-ad">${escHtml(b.ad)}</td>
+          <td class="col-tel">${escHtml(b.telefon || '—')}</td>
+          <td><span class="tekil-badge">Tekil</span></td>
           <td>${etiketChipler}</td>
-          <td style="font-size:10px;color:#6b7280;">${escHtml(b.organizasyon_adi || '')}</td>
-          <td><span class="video-badge ${b.video_var ? 'var' : 'yok'}">${b.video_var ? '✅ Var' : '❌ Yok'}</span></td>
+          <td style="font-size:10px;color:#5a8570;">${escHtml(b.organizasyon_adi || '')}</td>
+          <td><span class="video-badge ${b.video_var ? 'var' : 'yok'}">${b.video_var ? '✓ Var' : '✗ Yok'}</span></td>
           <td><span class="video-sayi ${(b.video_sayisi || 0) === 0 ? 'sifir' : ''}">${b.video_sayisi || 0}</span></td>
+          <td><span class="sms-badge-print ${b.sms_gonderildi ? 'sms-var' : 'sms-yok'}">${b.sms_gonderildi ? '✓ Gönderildi' : '— Bekliyor'}</span></td>
         </tr>`;
     });
 
     const videoVar = bagiscilar.filter(b => b.video_var).length;
     const videoYok = bagiscilar.length - videoVar;
+    const smsGonderildi = bagiscilar.filter(b => b.sms_gonderildi).length;
+    const smsBekliyor = bagiscilar.length - smsGonderildi;
 
     const html = `<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>${orgAd}Bağışçı Listesi</title>
+  <title>${orgAd}Bagisci Listesi</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
+    :root {
+      --bg:      #0a1410;
+      --bg2:     #0f1e18;
+      --bg3:     #152820;
+      --bg4:     #1d3529;
+      --bg5:     #254232;
+      --border:  #2a4a38;
+      --accent:  #10b981;
+      --accent2: #34d399;
+      --red:     #ef4444;
+      --yellow:  #fbbf24;
+      --text:    #e8f5ee;
+      --text2:   #a8c9b8;
+      --text3:   #5a8570;
+    }
     body {
       font-family: 'Inter', Arial, sans-serif;
       font-size: 11.5px;
-      color: #1a1a2e;
-      background: #f8fafc;
+      background: var(--bg);
+      color: var(--text);
       padding: 28px 32px;
       line-height: 1.5;
     }
-
-    /* ── HEADER ── */
     .page-header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      margin-bottom: 20px;
-      padding-bottom: 16px;
-      border-bottom: 2px solid #10b981;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid var(--accent);
     }
-    .page-header-left h1 {
-      font-size: 20px;
-      font-weight: 700;
-      color: #0a1410;
-      letter-spacing: -0.3px;
+    .page-header-left h1 { font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; }
+    .page-header-left p { font-size: 11px; color: var(--text3); margin-top: 4px; }
+    .filtre-bilgi {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 3px 10px;
+      background: rgba(16,185,129,0.12);
+      border: 1px solid rgba(16,185,129,0.3);
+      border-radius: 20px;
+      font-size: 10px;
+      color: var(--accent);
+      font-weight: 600;
     }
-    .page-header-left p {
-      font-size: 11px;
-      color: #6b7280;
-      margin-top: 3px;
-    }
-    .page-header-right {
-      text-align: right;
-      font-size: 11px;
-      color: #6b7280;
-    }
-    .page-header-right strong {
-      display: block;
-      font-size: 13px;
-      color: #10b981;
-      font-weight: 700;
-    }
-
-    /* ── ÖZET KARTLAR ── */
+    .page-header-right { text-align: right; font-size: 11px; color: var(--text3); }
+    .page-header-right .sayi { display: block; font-size: 15px; color: var(--accent); font-weight: 700; margin-bottom: 2px; }
     .ozet {
       display: flex;
-      gap: 12px;
-      margin-bottom: 20px;
+      gap: 10px;
+      margin-bottom: 18px;
     }
     .ozet-kart {
       flex: 1;
       padding: 12px 16px;
       border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg3);
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
-    .ozet-kart .icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      flex-shrink: 0;
+    .ozet-kart .icon-box {
+      width: 36px; height: 36px; border-radius: 8px; background: var(--bg5);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
+    .ozet-kart .icon-box svg { width: 17px; height: 17px; }
     .ozet-kart .deger { font-size: 22px; font-weight: 800; line-height: 1; }
-    .ozet-kart .etiket { font-size: 10px; color: #6b7280; margin-top: 2px; font-weight: 500; }
-
-    .ozet-kart.toplam { background: #f0fdf4; border: 1px solid #bbf7d0; }
-    .ozet-kart.toplam .icon { background: #d1fae5; }
-    .ozet-kart.toplam .deger { color: #065f46; }
-
-    .ozet-kart.var { background: #ecfdf5; border: 1px solid #6ee7b7; }
-    .ozet-kart.var .icon { background: #a7f3d0; }
-    .ozet-kart.var .deger { color: #047857; }
-
-    .ozet-kart.yok { background: #fff5f5; border: 1px solid #fecaca; }
-    .ozet-kart.yok .icon { background: #fee2e2; }
-    .ozet-kart.yok .deger { color: #b91c1c; }
-
-    /* ── TABLO ── */
+    .ozet-kart .etiket { font-size: 9.5px; color: var(--text3); margin-top: 3px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; }
+    .ozet-kart.toplam .icon-box { background: rgba(16,185,129,0.15); }
+    .ozet-kart.toplam .deger { color: var(--accent); }
+    .ozet-kart.var .icon-box { background: rgba(16,185,129,0.1); }
+    .ozet-kart.var .deger { color: var(--accent2); }
+    .ozet-kart.yok .icon-box { background: rgba(239,68,68,0.12); }
+    .ozet-kart.yok .deger { color: var(--red); }
+    .ozet-kart.sms-ok .icon-box { background: rgba(16,185,129,0.2); }
+    .ozet-kart.sms-ok .deger { color: #34d399; }
+    .ozet-kart.sms-bek .icon-box { background: rgba(251,191,36,0.12); }
+    .ozet-kart.sms-bek .deger { color: var(--yellow); }
     .tablo-wrap {
-      background: #fff;
+      background: var(--bg2);
       border-radius: 12px;
-      border: 1px solid #e5e7eb;
+      border: 1px solid var(--border);
       overflow: hidden;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     }
-
     table { width: 100%; border-collapse: collapse; }
-
-    thead tr {
-      background: linear-gradient(135deg, #0f2d1f 0%, #1d4a30 100%);
-    }
+    thead tr { background: var(--bg4); }
     thead th {
-      color: #a7f3d0;
-      font-size: 10px;
-      font-weight: 600;
-      padding: 10px 12px;
-      text-align: left;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      white-space: nowrap;
+      color: var(--text3); font-size: 10px; font-weight: 600;
+      padding: 10px 10px; text-align: left;
+      letter-spacing: 0.5px; text-transform: uppercase;
+      white-space: nowrap; border-bottom: 1px solid var(--border);
     }
-    thead th:first-child { border-radius: 0; }
-
-    tbody tr { border-bottom: 1px solid #f3f4f6; transition: background 0.1s; }
+    tbody tr { border-bottom: 1px solid var(--border); }
     tbody tr:last-child { border-bottom: none; }
 
-    tbody tr.video-var td { background: #f0fdf4; }
-    tbody tr.video-yok td { background: #fff8f8; }
-
-    tbody td {
-      padding: 8px 12px;
-      color: #374151;
-      vertical-align: middle;
-      font-size: 11px;
+    /* ── SATIR RENKLERİ ── */
+    tbody tr.video-var td { background: rgba(16,185,129,0.06); }
+    tbody tr.video-yok td { background: rgba(239,68,68,0.05); }
+    /* SMS + Video var = parlak yeşil arka plan */
+    tbody tr.sms-ve-video-var td {
+      background: rgba(16,185,129,0.18) !important;
     }
+    tbody tr.sms-ve-video-var { border-left: 3px solid #10b981; }
 
-    .sira { color: #9ca3af; font-size: 10px; font-weight: 600; width: 28px; }
-    .ad { font-weight: 600; color: #111827; }
-    .tel { font-family: 'Courier New', monospace; font-size: 10.5px; color: #374151; }
+    tbody td { padding: 7px 10px; color: var(--text2); vertical-align: middle; font-size: 11px; }
+    .col-sira { color: var(--text3); font-size: 10px; font-weight: 600; }
+    .col-ad { font-weight: 600; color: var(--text); }
+    .col-tel { font-family: 'Courier New', monospace; font-size: 10.5px; color: var(--text2); }
     .hisse-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      background: #e0f2fe;
-      color: #0369a1;
-      border-radius: 20px;
-      font-size: 10px;
-      font-weight: 600;
+      display: inline-block; padding: 2px 7px;
+      background: rgba(16,185,129,0.15); color: var(--accent);
+      border-radius: 20px; font-size: 10px; font-weight: 600;
+      border: 1px solid rgba(16,185,129,0.25);
+    }
+    .grup-badge {
+      display: inline-block; margin-left: 3px; padding: 2px 6px;
+      background: rgba(251,191,36,0.12); color: #fbbf24;
+      border-radius: 20px; font-size: 9px; font-weight: 600;
+      border: 1px solid rgba(251,191,36,0.25);
+    }
+    .tekil-badge {
+      display: inline-block; padding: 2px 7px;
+      background: rgba(90,133,112,0.15); color: var(--text3);
+      border-radius: 20px; font-size: 10px; font-weight: 600;
+      border: 1px solid rgba(90,133,112,0.25);
     }
     .etiket-chip {
-      display: inline-block;
-      padding: 1px 6px;
-      background: #f3f4f6;
-      color: #4b5563;
-      border-radius: 4px;
-      font-size: 10px;
-      margin: 1px;
+      display: inline-block; padding: 1px 5px;
+      background: var(--bg4); color: var(--text2);
+      border-radius: 4px; font-size: 10px; margin: 1px;
+      border: 1px solid var(--border);
     }
     .video-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
-      border-radius: 20px;
-      font-size: 10px;
-      font-weight: 600;
+      display: inline-block; padding: 3px 9px;
+      border-radius: 20px; font-size: 10px; font-weight: 700;
     }
-    .video-badge.var { background: #d1fae5; color: #065f46; }
-    .video-badge.yok { background: #fee2e2; color: #991b1b; }
+    .video-badge.var { background: rgba(16,185,129,0.2); color: var(--accent); border: 1px solid rgba(16,185,129,0.4); }
+    .video-badge.yok { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
     .video-sayi {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 22px;
-      height: 22px;
-      background: #10b981;
-      color: #fff;
-      border-radius: 50%;
-      font-size: 10px;
-      font-weight: 700;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px;
+      background: var(--accent); color: #fff;
+      border-radius: 50%; font-size: 10px; font-weight: 700;
     }
-    .video-sayi.sifir { background: #e5e7eb; color: #9ca3af; }
-
-    /* ── FOOTER ── */
+    .video-sayi.sifir { background: var(--bg5); color: var(--text3); }
+    /* SMS badge yazdırma */
+    .sms-badge-print {
+      display: inline-block; padding: 3px 9px;
+      border-radius: 20px; font-size: 10px; font-weight: 700;
+    }
+    .sms-badge-print.sms-var {
+      background: rgba(16,185,129,0.25);
+      color: #34d399;
+      border: 1px solid rgba(16,185,129,0.5);
+    }
+    .sms-badge-print.sms-yok {
+      background: rgba(251,191,36,0.12);
+      color: #fbbf24;
+      border: 1px solid rgba(251,191,36,0.3);
+    }
     .page-footer {
-      margin-top: 16px;
-      text-align: center;
-      font-size: 10px;
-      color: #9ca3af;
+      margin-top: 14px; text-align: center;
+      font-size: 10px; color: var(--text3);
+      padding-top: 10px; border-top: 1px solid var(--border);
     }
-
-    /* ── PRINT ── */
     @media print {
-      body { background: #fff; padding: 0; }
-      .tablo-wrap { box-shadow: none; border: 1px solid #d1d5db; }
-      @page { margin: 10mm 12mm; size: A4 landscape; }
+      body { background: #0a1410 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 0; }
+      .tablo-wrap { box-shadow: none; }
+      @page { margin: 8mm 10mm; size: A4 landscape; }
       thead { display: table-header-group; }
       tbody tr { page-break-inside: avoid; }
+      tbody tr.sms-ve-video-var td { background: rgba(16,185,129,0.18) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
 </head>
 <body>
-
   <div class="page-header">
     <div class="page-header-left">
       <h1>Bağışçı Listesi</h1>
-      <p>${orgAd ? orgAd.replace(' — ', '') : 'Tüm Organizasyonlar'}</p>
+      <p>${orgAd ? orgAd.replace(' — ', '') : 'Tüm Organizasyonlar'} &mdash; ${tarih}</p>
+      ${filtreler.length > 0 ? `<span class="filtre-bilgi">Filtre: ${filtreler.join(' · ')}</span>` : ''}
     </div>
     <div class="page-header-right">
-      <strong>${bagiscilar.length} Bağışçı</strong>
-      ${tarih}
+      <span class="sayi">${bagiscilar.length} Bağışçı</span>
+      Video Var: ${videoVar} &nbsp;|&nbsp; Video Yok: ${videoYok}<br>
+      SMS Gönderildi: ${smsGonderildi} &nbsp;|&nbsp; SMS Bekliyor: ${smsBekliyor}
     </div>
   </div>
 
   <div class="ozet">
     <div class="ozet-kart toplam">
-      <div class="icon">👥</div>
-      <div>
-        <div class="deger">${bagiscilar.length}</div>
-        <div class="etiket">Toplam Bağışçı</div>
+      <div class="icon-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       </div>
+      <div><div class="deger">${bagiscilar.length}</div><div class="etiket">Toplam</div></div>
     </div>
     <div class="ozet-kart var">
-      <div class="icon">✅</div>
-      <div>
-        <div class="deger">${videoVar}</div>
-        <div class="etiket">Video Var</div>
+      <div class="icon-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
       </div>
+      <div><div class="deger">${videoVar}</div><div class="etiket">Video Var</div></div>
     </div>
     <div class="ozet-kart yok">
-      <div class="icon">❌</div>
-      <div>
-        <div class="deger">${videoYok}</div>
-        <div class="etiket">Video Yok</div>
+      <div class="icon-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
       </div>
+      <div><div class="deger">${videoYok}</div><div class="etiket">Video Yok</div></div>
+    </div>
+    <div class="ozet-kart sms-ok">
+      <div class="icon-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><polyline points="9 11 12 14 15 11"/></svg>
+      </div>
+      <div><div class="deger">${smsGonderildi}</div><div class="etiket">SMS Gönderildi</div></div>
+    </div>
+    <div class="ozet-kart sms-bek">
+      <div class="icon-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div><div class="deger">${smsBekliyor}</div><div class="etiket">SMS Bekliyor</div></div>
     </div>
   </div>
 
@@ -2117,8 +2246,9 @@ async function bagisciListesiYazdir() {
           <th>Hisse</th>
           <th>Etiketler</th>
           <th>Organizasyon</th>
-          <th>Video Durumu</th>
-          <th>Video Sayısı</th>
+          <th>Video</th>
+          <th>Adet</th>
+          <th>SMS</th>
         </tr>
       </thead>
       <tbody>${satirlar}</tbody>
@@ -2126,9 +2256,8 @@ async function bagisciListesiYazdir() {
   </div>
 
   <div class="page-footer">
-    İÇDER Kurban Videoları — ${tarih} tarihinde oluşturuldu
+    İÇDER Kurban Videoları &mdash; ${tarih} tarihinde oluşturuldu${filtreAciklama}
   </div>
-
 </body>
 </html>`;
 

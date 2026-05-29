@@ -113,6 +113,11 @@
               <option value="gruplu">7li Hisseler</option>
               <option value="tekil">Tekiller</option>
             </select>
+            <select class="form-select" id="bagisciSmsDurum" onchange="bagiscilarYukle()" style="width:auto; padding:6px 10px;">
+              <option value="">Tüm SMS</option>
+              <option value="gonderildi">SMS Gönderildi ✅</option>
+              <option value="bekliyor">SMS Bekliyor ⏳</option>
+            </select>
             <input type="text" class="form-input" id="bagisciArama" placeholder="İsim veya telefon ara..." style="width:200px; padding:6px 10px;" oninput="bagisciAramaDebounce()">
             <button class="btn btn-success btn-sm" onclick="kurbanEkleModal()" style="background:var(--accent);color:#fff;border:none;">
               <i class="fas fa-plus-circle"></i> Kurban + Hisse Ekle

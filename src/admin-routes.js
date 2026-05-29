@@ -392,6 +392,17 @@ router.delete('/videolar/:id', adminKontrol, ac(async (req, res) => {
   res.json({ ok: true, cloudinary_public_id: video.cloudinary_public_id });
 }));
 
+// ─── SMS GÖNDERİLDİ TOGGLE ───────────────────────────────────────────────────
+router.post('/bagiscilar/:id/sms-gonderildi', adminKontrol, ac(async (req, res) => {
+  const { aktif } = req.body;
+  const db = await getDb();
+  const bagisci = db.prepare('SELECT id FROM bagiscilar WHERE id=?').get(req.params.id);
+  if (!bagisci) return res.status(404).json({ hata: 'Bağışçı bulunamadı' });
+  db.prepare('UPDATE bagiscilar SET sms_gonderildi=?, sms_tarihi=? WHERE id=?')
+    .run(aktif ? 1 : 0, aktif ? new Date().toISOString() : null, req.params.id);
+  res.json({ ok: true, sms_gonderildi: aktif ? 1 : 0 });
+}));
+
 // ─── İZLEME LOGLARI ──────────────────────────────────────────────────────────
 router.get('/izleme-loglari', adminKontrol, ac(async (req, res) => {
   const { limit = 300, video_id, org_id, sadece_izleme, sadece_arama } = req.query;

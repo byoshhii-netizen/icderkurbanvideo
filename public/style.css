@@ -937,6 +937,122 @@ tbody td {
   }
 }
 
+/* ── DURUM KUTUSU (Video Var/Yok + SMS Gönderildi/Bekliyor) ── */
+.durum-kutu {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.durum-video-var {
+  background: rgba(16,185,129,0.18);
+  color: var(--accent);
+  border: 1px solid rgba(16,185,129,0.4);
+}
+
+.durum-video-yok {
+  background: rgba(239,68,68,0.15);
+  color: var(--red);
+  border: 1px solid rgba(239,68,68,0.35);
+}
+
+.durum-sms-var {
+  background: rgba(16,185,129,0.25);
+  color: #34d399;
+  border: 1px solid rgba(16,185,129,0.55);
+  box-shadow: 0 0 6px rgba(16,185,129,0.2);
+}
+
+.durum-sms-yok {
+  background: rgba(251,191,36,0.12);
+  color: var(--yellow);
+  border: 1px solid rgba(251,191,36,0.3);
+}
+
+/* SMS + Video var = parlak yeşil satır */
+.bagisci-row-sms-ok { background: rgba(16,185,129,0.12) !important; }
+.bagisci-row-sms-ok:hover { background: rgba(16,185,129,0.2) !important; }
+
+/* ── SMS GÖNDERİLDİ BUTONU ── */
+.sms-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: var(--r);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.sms-bekliyor {
+  background: rgba(251,191,36,0.12);
+  color: var(--yellow);
+  border: 1px solid rgba(251,191,36,0.35);
+}
+
+.sms-bekliyor:hover {
+  background: rgba(251,191,36,0.22);
+  border-color: var(--yellow);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(251,191,36,0.2);
+}
+
+.sms-gonderildi {
+  background: rgba(16,185,129,0.15);
+  color: var(--accent);
+  border: 1px solid rgba(16,185,129,0.4);
+}
+
+.sms-gonderildi:hover {
+  background: rgba(239,68,68,0.12);
+  color: var(--red);
+  border-color: rgba(239,68,68,0.35);
+}
+
+.sms-gonderildi:hover::after {
+  content: ' — Geri Al';
+  font-size: 0.72rem;
+}
+
+/* SMS gönderildi animasyonu — icderrr-clone tarzı pulse */
+@keyframes smsPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.5); transform: scale(1); }
+  40%  { box-shadow: 0 0 0 8px rgba(16,185,129,0); transform: scale(1.06); }
+  100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); transform: scale(1); }
+}
+
+.sms-pulse {
+  animation: smsPulse 0.6s ease-out;
+}
+
+/* SMS gönderildi badge — tablo satırında göster */
+.sms-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(16,185,129,0.12);
+  color: var(--accent);
+  border: 1px solid rgba(16,185,129,0.3);
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  animation: fadeInBadge 0.3s ease;
+}
+
+@keyframes fadeInBadge {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
 /* ── PAGINATION ── */
 .pagination {
   display: flex;
