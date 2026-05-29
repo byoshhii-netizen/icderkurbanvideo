@@ -104,6 +104,7 @@ async function ayarlariYukle() {
         tog.checked = d.isimle_arama_aktif === '1';
         const durum = document.getElementById('isimleAramaDurum');
         if (durum) durum.textContent = tog.checked ? 'Açık (isim + tel + etiket)' : 'Kapalı (sadece tel/etiket)';
+        _isimAramaUiGuncelle(tog.checked);
       }
     }
     if (d.varsayilan_video_basligi !== undefined) {
@@ -375,10 +376,6 @@ function kurbanEkleModal() {
           <label class="form-label" style="font-size:0.75rem;">Etiket / Sıra No <small style="color:var(--text3)">(arama için)</small></label>
           <input type="text" class="form-input" id="hisse${i+1}Etiket" placeholder="TC, sıra no, vb.">
         </div>
-        <div class="form-group" style="margin:0;">
-          <label class="form-label" style="font-size:0.75rem;">Kimin Adına <small style="color:var(--text3)">(opsiyonel)</small></label>
-          <input type="text" class="form-input" id="hisse${i+1}KiminAdina" placeholder="Vefat eden vb.">
-        </div>
       </div>
     </div>
   `).join('');
@@ -479,7 +476,6 @@ async function kurbanKaydet() {
       ad: document.getElementById(`hisse${i}Ad`)?.value?.trim() || '',
       telefon: document.getElementById(`hisse${i}Tel`)?.value?.trim() || '',
       etiket: document.getElementById(`hisse${i}Etiket`)?.value?.trim() || '',
-      kiminAdina: document.getElementById(`hisse${i}KiminAdina`)?.value?.trim() || '',
     });
   }
 
@@ -509,7 +505,6 @@ async function kurbanKaydet() {
           hisse_no: i + 1,
           etiket1: h.etiket || null,
           etiket2: kupe || null,
-          etiket3: h.kiminAdina || null,
           grup_id: grupId,
         })
       });
@@ -596,7 +591,7 @@ async function bagiscilarYukle() {
   const q = document.getElementById('bagisciArama')?.value?.trim() || '';
   const tbody = document.getElementById('bagisciTableBody');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;"><div class="spinner" style="margin:auto;"></div></td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px;"><div class="spinner" style="margin:auto;"></div></td></tr>';
   try {
     const params = new URLSearchParams();
     if (orgId) params.set('org_id', orgId);
@@ -606,48 +601,104 @@ async function bagiscilarYukle() {
     const bagiscilar = await r.json();
     tbody.innerHTML = '';
     if (bagiscilar.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text3); padding:24px;">Bağışçı bulunamadı</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text3); padding:24px;">Bağışçı bulunamadı</td></tr>';
       return;
     }
+
+    // Grupları tespit et — grup_id'ye göre sırala, gruplular bir arada gelsin
+    const gruplar = {};
+    const tekiller = [];
     bagiscilar.forEach(b => {
-      const tr = document.createElement('tr');
-      tr.className = b.video_var ? 'bagisci-row-green' : 'bagisci-row-red';
-      tr.innerHTML = `
-        <td>
-          ${b.video_var
-            ? '<span class="dot-green"></span><span class="badge badge-green" style="font-size:0.7rem;">Video Var</span>'
-            : '<span class="dot-red"></span><span class="badge badge-red" style="font-size:0.7rem;">Video Yok</span>'
-          }
-        </td>
-        <td style="font-weight:600; color:var(--text)">${escHtml(b.ad)}</td>
-        <td style="font-family:monospace; font-size:0.85rem;">${escHtml(b.telefon || '-')}</td>
-        <td style="text-align:center;">
-          <span class="badge badge-gray" title="Hisse No" style="font-size:0.75rem;">${b.hisse_no || 1}. Hisse</span>
-          ${b.grup_id ? `<div style="font-size:0.68rem; color:var(--accent); margin-top:2px;" title="Grup ID: ${escHtml(b.grup_id)}"><i class="fas fa-link"></i> Grup</div>` : ''}
-          ${(b.etiket1 || b.etiket2 || b.etiket3) ? `<div style="font-size:0.7rem; color:var(--text3); margin-top:2px;">${[b.etiket1,b.etiket2,b.etiket3].filter(Boolean).map(e => escHtml(e)).join(' · ')}</div>` : ''}
-        </td>
-        <td style="font-size:0.85rem; color:var(--text3)">${escHtml(b.organizasyon_adi || '')}</td>
-        <td>
-          ${b.video_sayisi > 0
-            ? `<span class="video-count-badge">${b.video_sayisi}</span>`
-            : '<span style="color:var(--text3)">0</span>'
-          }
-        </td>
-        <td>
-          <div style="display:flex; gap:6px;">
-            <button class="btn btn-ghost btn-sm btn-icon" onclick="bagisciDuzenle(${b.id})" title="Düzenle"><i class="fas fa-edit"></i></button>
-            <button class="btn btn-primary btn-sm" onclick="bagisciVideoEkle(${b.id}, '${escHtml(b.ad)}')" title="Video Ekle">
-              <i class="fas fa-plus"></i> Video
-            </button>
-            <button class="btn btn-danger btn-sm btn-icon" onclick="bagisciSil(${b.id})" title="Sil"><i class="fas fa-trash"></i></button>
-          </div>
+      if (b.grup_id) {
+        if (!gruplar[b.grup_id]) gruplar[b.grup_id] = [];
+        gruplar[b.grup_id].push(b);
+      } else {
+        tekiller.push(b);
+      }
+    });
+
+    // Önce grupları render et, sonra tekilleri
+    let grupSayac = 0;
+    const grupRenkleri = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+
+    Object.values(gruplar).forEach(grup => {
+      const renk = grupRenkleri[grupSayac % grupRenkleri.length];
+      grupSayac++;
+      // Grup başlık satırı
+      const baslikTr = document.createElement('tr');
+      baslikTr.innerHTML = `
+        <td colspan="8" style="padding:6px 12px; background:${renk}18; border-left:3px solid ${renk}; border-top:2px solid ${renk}40;">
+          <span style="font-size:0.78rem; font-weight:700; color:${renk};">
+            <i class="fas fa-users"></i> ${grup.length} Hisseli Kurban Grubu
+          </span>
+          <span style="font-size:0.72rem; color:var(--text3); margin-left:8px;">${grup.filter(b=>b.video_var).length}/${grup.length} video var</span>
         </td>
       `;
+      tbody.appendChild(baslikTr);
+
+      // Grup üyelerini hisse_no'ya göre sırala
+      grup.sort((a, c) => (a.hisse_no || 1) - (c.hisse_no || 1));
+      grup.forEach((b, idx) => {
+        const isLast = idx === grup.length - 1;
+        const tr = document.createElement('tr');
+        tr.className = b.video_var ? 'bagisci-row-green' : 'bagisci-row-red';
+        tr.style.cssText = `border-left:3px solid ${renk}; ${isLast ? 'border-bottom:2px solid ' + renk + '40;' : ''}`;
+        tr.innerHTML = _bagisciSatirHtml(b);
+        tbody.appendChild(tr);
+      });
+
+      // Grup arası boşluk
+      const boslukTr = document.createElement('tr');
+      boslukTr.innerHTML = '<td colspan="8" style="padding:4px; background:transparent; border:none;"></td>';
+      tbody.appendChild(boslukTr);
+    });
+
+    // Tekil bağışçılar
+    tekiller.forEach(b => {
+      const tr = document.createElement('tr');
+      tr.className = b.video_var ? 'bagisci-row-green' : 'bagisci-row-red';
+      tr.innerHTML = _bagisciSatirHtml(b);
       tbody.appendChild(tr);
     });
+
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--red); padding:24px;">Yükleme hatası</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--red); padding:24px;">Yükleme hatası</td></tr>';
   }
+}
+
+function _bagisciSatirHtml(b) {
+  return `
+    <td>
+      ${b.video_var
+        ? '<span class="dot-green"></span><span class="badge badge-green" style="font-size:0.7rem;">Video Var</span>'
+        : '<span class="dot-red"></span><span class="badge badge-red" style="font-size:0.7rem;">Video Yok</span>'
+      }
+    </td>
+    <td style="font-weight:600; color:var(--text)">${escHtml(b.ad)}</td>
+    <td style="font-family:monospace; font-size:0.85rem;">${escHtml(b.telefon || '-')}</td>
+    <td style="text-align:center;">
+      <span class="badge badge-gray" style="font-size:0.75rem;">${b.hisse_no || 1}. Hisse</span>
+    </td>
+    <td style="font-size:0.75rem; color:var(--text3);">
+      ${[b.etiket1,b.etiket2,b.etiket3,b.etiket4].filter(Boolean).map(e => `<span style="background:var(--bg4);border-radius:3px;padding:1px 4px;margin:1px;display:inline-block;">${escHtml(e)}</span>`).join('')}
+    </td>
+    <td style="font-size:0.85rem; color:var(--text3)">${escHtml(b.organizasyon_adi || '')}</td>
+    <td>
+      ${b.video_sayisi > 0
+        ? `<span class="video-count-badge">${b.video_sayisi}</span>`
+        : '<span style="color:var(--text3)">0</span>'
+      }
+    </td>
+    <td>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="bagisciDuzenle(${b.id})" title="Düzenle"><i class="fas fa-edit"></i></button>
+        <button class="btn btn-primary btn-sm" onclick="bagisciVideoEkle(${b.id}, '${escHtml(b.ad)}')" title="Video Ekle">
+          <i class="fas fa-plus"></i> Video
+        </button>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="bagisciSil(${b.id})" title="Sil"><i class="fas fa-trash"></i></button>
+      </div>
+    </td>
+  `;
 }
 
 function bagisciAramaDebounce() {
@@ -656,15 +707,16 @@ function bagisciAramaDebounce() {
 }
 
 function bagisciEkleModal() {
+  tekilVideoData = null;
   const orgOptions = organizasyonlar.map(o =>
     `<option value="${o.id}">${escHtml(o.ad)} (${o.yil})</option>`
   ).join('');
   modalGoster(`
     <div class="modal-header">
-      <div class="modal-title">Bağışçı Ekle</div>
+      <div class="modal-title">Tekil Bağışçı Ekle</div>
       <button class="modal-close" onclick="modalKapat()"><i class="fas fa-times"></i></button>
     </div>
-    <div class="modal-body" style="padding:20px; max-height:80vh; overflow-y:auto;">
+    <div class="modal-body" style="padding:20px; max-height:85vh; overflow-y:auto;">
       <div class="form-group">
         <label class="form-label">Ad Soyad *</label>
         <input type="text" class="form-input" id="bagisciAdInput" placeholder="Ahmet Yılmaz">
@@ -697,12 +749,59 @@ function bagisciEkleModal() {
           `).join('')}
         </div>
       </div>
+
+      <!-- VİDEO YÜKLEME -->
+      <div style="margin-top:4px; padding-top:14px; border-top:1px solid var(--border);">
+        <div style="font-size:0.85rem; font-weight:600; color:var(--text2); margin-bottom:10px;">
+          <i class="fas fa-video" style="color:var(--accent)"></i> Video Yükle
+          <small style="font-weight:400; color:var(--text3); margin-left:8px;">Opsiyonel — sonradan da eklenebilir</small>
+        </div>
+        <div class="upload-area" id="tekilUploadArea"
+          onclick="document.getElementById('tekilVideoInput').click()"
+          ondragover="tekilDragOver(event)" ondrop="tekilDropVideo(event)"
+          style="padding:14px; text-align:center; cursor:pointer;">
+          <i class="fas fa-cloud-upload-alt" style="font-size:1.4rem; color:var(--text3);"></i>
+          <p style="margin:5px 0 2px; color:var(--text3); font-size:0.85rem;">Video seçmek için tıklayın veya sürükleyin</p>
+          <small style="color:var(--text3);">MP4, MOV, WebM — Maks 500MB</small>
+        </div>
+        <input type="file" id="tekilVideoInput" accept="video/*" style="display:none" onchange="tekilVideoSecildi(this)">
+        <div class="upload-progress" id="tekilUploadProgress" style="display:none; margin-top:8px;">
+          <div class="upload-progress-bar" id="tekilUploadProgressBar" style="width:0%"></div>
+        </div>
+        <div id="tekilUploadStatus" style="font-size:0.82rem; color:var(--text3); margin-top:6px;"></div>
+      </div>
+
       <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
         <button class="btn btn-ghost" onclick="modalKapat()">İptal</button>
-        <button class="btn btn-primary" onclick="bagisciKaydet()"><i class="fas fa-save"></i> Kaydet</button>
+        <button class="btn btn-primary" id="tekilKaydetBtn" onclick="bagisciKaydet()"><i class="fas fa-save"></i> Kaydet</button>
       </div>
     </div>
   `);
+}
+
+let tekilVideoData = null;
+
+function tekilDragOver(e) {
+  e.preventDefault();
+  document.getElementById('tekilUploadArea').classList.add('drag-over');
+}
+function tekilDropVideo(e) {
+  e.preventDefault();
+  document.getElementById('tekilUploadArea').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) tekilVideoSecildiDosya(file);
+}
+function tekilVideoSecildi(input) {
+  if (input.files[0]) tekilVideoSecildiDosya(input.files[0]);
+}
+function tekilVideoSecildiDosya(file) {
+  if (!file.type.startsWith('video/')) { toast('Sadece video dosyası yükleyebilirsiniz', 'error'); return; }
+  if (file.size > 500 * 1024 * 1024) { toast('Dosya 500MB\'dan büyük olamaz', 'error'); return; }
+  tekilVideoData = file;
+  const area = document.getElementById('tekilUploadArea');
+  area.innerHTML = `<i class="fas fa-file-video" style="color:var(--accent); font-size:1.3rem;"></i>
+    <p style="margin:5px 0 2px; color:var(--accent); font-size:0.85rem;">${escHtml(file.name)}</p>
+    <small style="color:var(--text3);">${(file.size/1024/1024).toFixed(1)} MB</small>`;
 }
 
 async function bagisciKaydet() {
@@ -715,16 +814,81 @@ async function bagisciKaydet() {
     etiketler[`etiket${i}`] = document.getElementById(`bagisciEtiket${i}Input`)?.value?.trim() || '';
   }
   if (!ad || !organizasyon_id) { toast('Ad ve organizasyon gerekli', 'error'); return; }
+
+  const btn = document.getElementById('tekilKaydetBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Kaydediliyor...'; }
+
   try {
+    // 1. Bağışçıyı kaydet
     const r = await fetch('/api/admin/bagiscilar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ad, telefon, organizasyon_id, hisse_no: parseInt(hisse_no), ...etiketler })
     });
     const d = await r.json();
-    if (d.ok) { toast('Bağışçı eklendi', 'success'); modalKapat(); bagiscilarYukle(); }
-    else toast(d.hata || 'Hata', 'error');
-  } catch (e) { toast('Bağlantı hatası', 'error'); }
+    if (!d.ok) { toast(d.hata || 'Hata', 'error'); return; }
+
+    const bagisciId = d.id;
+
+    // 2. Video varsa yükle
+    if (tekilVideoData && bagisciId) {
+      const status = document.getElementById('tekilUploadStatus');
+      const prog = document.getElementById('tekilUploadProgress');
+      const progBar = document.getElementById('tekilUploadProgressBar');
+      if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Video yükleniyor...';
+      if (prog) prog.style.display = 'block';
+
+      const formData = new FormData();
+      formData.append('video', tekilVideoData);
+
+      const uploadResult = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round(e.loaded / e.total * 100);
+            if (progBar) progBar.style.width = pct + '%';
+            if (status) status.textContent = `Yükleniyor... %${pct}`;
+          }
+        };
+        xhr.onload = () => { try { resolve(JSON.parse(xhr.responseText)); } catch (_) { reject(new Error('Parse hatası')); } };
+        xhr.onerror = () => reject(new Error('Ağ hatası'));
+        xhr.open('POST', '/api/medya/upload');
+        xhr.send(formData);
+      });
+
+      if (uploadResult.hata) throw new Error(uploadResult.hata);
+      if (progBar) progBar.style.width = '100%';
+      if (status) status.textContent = 'Kaydediliyor...';
+
+      const videoR = await fetch('/api/admin/videolar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bagisci_id: bagisciId,
+          organizasyon_id,
+          cloudinary_url: uploadResult.url,
+          cloudinary_public_id: uploadResult.public_id,
+          thumbnail_url: uploadResult.thumbnail_url || null,
+          sure: uploadResult.duration || 0,
+          boyut: uploadResult.bytes || 0,
+        })
+      });
+      const videoD = await videoR.json();
+      if (!videoD.ok) throw new Error(videoD.hata || 'Video kayıt hatası');
+
+      toast('Bağışçı eklendi + video yüklendi', 'success', 4000);
+    } else {
+      toast('Bağışçı eklendi', 'success');
+    }
+
+    tekilVideoData = null;
+    modalKapat();
+    bagiscilarYukle();
+    videolarYukle();
+  } catch (e) {
+    toast('Hata: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Kaydet'; }
+  }
 }
 
 function bagisciDuzenle(id) {
@@ -1543,9 +1707,21 @@ async function isimleAramaGuncelle(aktif) {
     if (d.ok) {
       const durum = document.getElementById('isimleAramaDurum');
       if (durum) durum.textContent = aktif ? 'Açık (isim + tel + etiket)' : 'Kapalı (sadece tel/etiket)';
+      // Etiket/isim alanlarını aktif/deaktif et
+      _isimAramaUiGuncelle(aktif);
       toast('İsimle arama ' + (aktif ? 'açıldı' : 'kapatıldı'), 'success');
+    } else {
+      toast(d.hata || 'Hata', 'error');
     }
   } catch (e) { toast('Bağlantı hatası', 'error'); }
+}
+
+function _isimAramaUiGuncelle(aktif) {
+  // Ayarlar sayfasında isimle arama kapalıyken bilgi notu göster
+  const bilgi = document.getElementById('isimAramaBilgi');
+  if (bilgi) {
+    bilgi.style.display = aktif ? 'none' : 'block';
+  }
 }
 
 async function sifreDegistir() {
