@@ -351,6 +351,7 @@ async function aktifOrgSec(id) {
 
 // ─── KURBAN + 7 HİSSE EKLE (icderrr tarzı) ───────────────────────────────────
 let kurbanVideoData = null; // seçilen video dosyası
+let _aktifGrupIdler = []; // grup düzenleme için aktif ID listesi
 
 function kurbanEkleModal() {
   kurbanVideoData = null;
@@ -635,12 +636,20 @@ async function bagiscilarYukle() {
       grupSayac++;
       // Grup başlık satırı
       const baslikTr = document.createElement('tr');
+      const grupIdler = grup.map(b => b.id);
       baslikTr.innerHTML = `
         <td colspan="8" style="padding:6px 12px; background:${renk}18; border-left:3px solid ${renk}; border-top:2px solid ${renk}40;">
-          <span style="font-size:0.78rem; font-weight:700; color:${renk};">
-            <i class="fas fa-users"></i> ${grup.length} Hisseli Kurban Grubu
-          </span>
-          <span style="font-size:0.72rem; color:var(--text3); margin-left:8px;">${grup.filter(b=>b.video_var).length}/${grup.length} video var</span>
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <span style="font-size:0.78rem; font-weight:700; color:${renk};">
+                <i class="fas fa-users"></i> ${grup.length} Hisseli Kurban Grubu
+              </span>
+              <span style="font-size:0.72rem; color:var(--text3); margin-left:8px;">${grup.filter(b=>b.video_var).length}/${grup.length} video var</span>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="grupSil([${grupIdler.join(',')}])" title="Grubu Sil" style="font-size:0.72rem; padding:3px 8px;">
+              <i class="fas fa-trash"></i> Grubu Sil
+            </button>
+          </div>
         </td>
       `;
       tbody.appendChild(baslikTr);
@@ -920,6 +929,7 @@ function bagisciDuzenle(id) {
 
     if (grupUyeleri.length > 1) {
       // ─── GRUP DÜZENLEMESİ ───────────────────────────────────────────────────
+      _aktifGrupIdler = grupUyeleri.map(u => u.id); // global'e kaydet
       const hisseSatirlari = grupUyeleri.map(u => `
         <div style="border:1px solid var(--border); border-radius:8px; padding:12px; background:var(--bg3);">
           <div style="font-size:0.8rem; font-weight:700; color:var(--accent); margin-bottom:8px;">
@@ -972,7 +982,7 @@ function bagisciDuzenle(id) {
           </div>
           <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
             <button class="btn btn-ghost" onclick="modalKapat()">İptal</button>
-            <button class="btn btn-primary" onclick="grupGuncelle(${JSON.stringify(grupUyeleri.map(u => u.id))})">
+            <button class="btn btn-primary" id="grupGuncelleBtn" onclick="grupGuncelle(_aktifGrupIdler)">
               <i class="fas fa-save"></i> Tümünü Güncelle
             </button>
           </div>
@@ -1028,11 +1038,26 @@ function bagisciDuzenle(id) {
   });
 }
 
+async function grupSil(idler) {
+  if (!confirm(`Bu gruptaki ${idler.length} bağışçı ve tüm videoları silinecek. Emin misiniz?`)) return;
+  try {
+    let silinen = 0;
+    for (const id of idler) {
+      const r = await fetch('/api/admin/bagiscilar/' + id, { method: 'DELETE' });
+      const d = await r.json();
+      if (d.ok) silinen++;
+    }
+    toast(`${silinen} bağışçı silindi`, 'success');
+    bagiscilarYukle();
+    videolarYukle();
+  } catch (e) { toast('Hata: ' + e.message, 'error'); }
+}
+
 async function grupGuncelle(idler) {
   const orgId = document.getElementById('grupOrgInput')?.value;
   if (!orgId) { toast('Organizasyon seçin', 'error'); return; }
 
-  const btn = event?.target;
+  const btn = document.getElementById('grupGuncelleBtn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Kaydediliyor...'; }
 
   try {
