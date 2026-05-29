@@ -884,6 +884,59 @@ tbody td {
   padding: 0 5px;
 }
 
+/* ── İZLENME BADGE (kırmızı) ── */
+.izlenme-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 2px 8px;
+  background: rgba(239, 68, 68, 0.18);
+  color: var(--red);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+/* ── DESTEK HATTI ── */
+.destek-hatti {
+  margin-top: 18px;
+}
+
+.destek-hatti a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 50px;
+  color: var(--text2);
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.destek-hatti a:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg4);
+}
+
+.destek-hatti a i {
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+@media (max-width: 480px) {
+  .destek-hatti a {
+    font-size: 0.85rem;
+    padding: 9px 16px;
+  }
+}
+
 /* ── PAGINATION ── */
 .pagination {
   display: flex;

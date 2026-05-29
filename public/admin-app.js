@@ -706,6 +706,10 @@ function _bagisciSatirHtml(b) {
         ? `<span class="video-count-badge">${b.video_sayisi}</span>`
         : '<span style="color:var(--text3)">0</span>'
       }
+      ${b.izlenme_sayisi > 0
+        ? `<span class="izlenme-badge" title="${b.izlenme_sayisi} kez izlendi"><i class="fas fa-eye"></i> ${b.izlenme_sayisi}</span>`
+        : ''
+      }
     </td>
     <td>
       <div style="display:flex; gap:6px;">

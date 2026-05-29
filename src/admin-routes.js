@@ -149,7 +149,8 @@ router.get('/bagiscilar', adminKontrol, ac(async (req, res) => {
   const db = await getDb();
   let sql = `
     SELECT b.*, o.ad as organizasyon_adi,
-           (SELECT COUNT(*) FROM videolar WHERE bagisci_id=b.id) as video_sayisi
+           (SELECT COUNT(*) FROM videolar WHERE bagisci_id=b.id) as video_sayisi,
+           (SELECT COUNT(*) FROM izleme_loglari WHERE bagisci_id=b.id AND video_id IS NOT NULL) as izlenme_sayisi
     FROM bagiscilar b
     JOIN organizasyonlar o ON b.organizasyon_id = o.id
     WHERE 1=1
