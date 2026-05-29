@@ -1782,6 +1782,154 @@ async function sifreDegistir() {
   } catch (e) { toast('Bağlantı hatası', 'error'); }
 }
 
+async function goruntulenmeSifirla() {
+  if (!confirm('Tüm izlenme kayıtları silinecek! Bu işlem geri alınamaz. Emin misiniz?')) return;
+  try {
+    const r = await fetch('/api/admin/izlenmeleri-sifirla', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      toast(`${d.silinen} izlenme kaydı silindi`, 'success');
+      dashboardYukle();
+    } else toast(d.hata || 'Hata', 'error');
+  } catch (e) { toast('Bağlantı hatası', 'error'); }
+}
+
+async function bagisciListesiYazdir() {
+  const orgId = document.getElementById('yazdirilacakOrgInput')?.value || '';
+  toast('Liste hazırlanıyor...', 'info');
+
+  try {
+    const params = new URLSearchParams();
+    if (orgId) params.set('org_id', orgId);
+    const r = await fetch('/api/admin/bagiscilar?' + params.toString());
+    const bagiscilar = await r.json();
+
+    if (bagiscilar.length === 0) { toast('Bağışçı bulunamadı', 'error'); return; }
+
+    // Org adını bul
+    const orgAd = orgId
+      ? (organizasyonlar.find(o => String(o.id) === String(orgId))?.ad || '') + ' — '
+      : '';
+
+    const tarih = new Date().toLocaleDateString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric' });
+
+    // Grupları ve tekilleri ayır
+    const gruplar = {};
+    const tekiller = [];
+    bagiscilar.forEach(b => {
+      if (b.grup_id) {
+        if (!gruplar[b.grup_id]) gruplar[b.grup_id] = [];
+        gruplar[b.grup_id].push(b);
+      } else {
+        tekiller.push(b);
+      }
+    });
+
+    let satirlar = '';
+    let sira = 1;
+
+    // Gruplar
+    Object.values(gruplar).forEach(grup => {
+      grup.sort((a, c) => (a.hisse_no || 1) - (c.hisse_no || 1));
+      grup.forEach(b => {
+        const etiketler = [b.etiket1, b.etiket2, b.etiket3, b.etiket4, b.etiket5, b.etiket6, b.etiket7]
+          .filter(Boolean).join(', ');
+        satirlar += `
+          <tr class="${b.video_var ? 'video-var' : 'video-yok'}">
+            <td>${sira++}</td>
+            <td>${escHtml(b.ad)}</td>
+            <td>${escHtml(b.telefon || '-')}</td>
+            <td style="text-align:center;">${b.hisse_no || 1}. Hisse</td>
+            <td>${escHtml(etiketler || '-')}</td>
+            <td>${escHtml(b.organizasyon_adi || '')}</td>
+            <td style="text-align:center;">${b.video_var ? '✅' : '❌'}</td>
+            <td style="text-align:center;">${b.video_sayisi || 0}</td>
+          </tr>`;
+      });
+    });
+
+    // Tekiller
+    tekiller.forEach(b => {
+      const etiketler = [b.etiket1, b.etiket2, b.etiket3, b.etiket4, b.etiket5, b.etiket6, b.etiket7]
+        .filter(Boolean).join(', ');
+      satirlar += `
+        <tr class="${b.video_var ? 'video-var' : 'video-yok'}">
+          <td>${sira++}</td>
+          <td>${escHtml(b.ad)}</td>
+          <td>${escHtml(b.telefon || '-')}</td>
+          <td style="text-align:center;">-</td>
+          <td>${escHtml(etiketler || '-')}</td>
+          <td>${escHtml(b.organizasyon_adi || '')}</td>
+          <td style="text-align:center;">${b.video_var ? '✅' : '❌'}</td>
+          <td style="text-align:center;">${b.video_sayisi || 0}</td>
+        </tr>`;
+    });
+
+    const videoVar = bagiscilar.filter(b => b.video_var).length;
+    const videoYok = bagiscilar.length - videoVar;
+
+    const html = `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>${orgAd}Bağışçı Listesi</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: #fff; padding: 16px; }
+    h1 { font-size: 16px; margin-bottom: 4px; }
+    .meta { font-size: 11px; color: #555; margin-bottom: 12px; }
+    .ozet { display: flex; gap: 20px; margin-bottom: 14px; font-size: 11px; }
+    .ozet span { padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+    .ozet .toplam { background: #e8f5ee; color: #0a7a4a; }
+    .ozet .var { background: #d1fae5; color: #065f46; }
+    .ozet .yok { background: #fee2e2; color: #991b1b; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #1d3529; color: #fff; padding: 7px 8px; text-align: left; font-size: 10px; }
+    td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+    tr.video-var td { background: #f0fdf4; }
+    tr.video-yok td { background: #fff5f5; }
+    tr:hover td { filter: brightness(0.97); }
+    @media print {
+      body { padding: 0; }
+      @page { margin: 12mm; size: A4 landscape; }
+    }
+  </style>
+</head>
+<body>
+  <h1>📋 ${orgAd}Bağışçı Listesi</h1>
+  <div class="meta">Yazdırma tarihi: ${tarih} — Toplam: ${bagiscilar.length} bağışçı</div>
+  <div class="ozet">
+    <span class="toplam">Toplam: ${bagiscilar.length}</span>
+    <span class="var">✅ Video Var: ${videoVar}</span>
+    <span class="yok">❌ Video Yok: ${videoYok}</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Ad Soyad</th>
+        <th>Telefon</th>
+        <th>Hisse</th>
+        <th>Etiketler</th>
+        <th>Organizasyon</th>
+        <th>Video</th>
+        <th>Video Sayısı</th>
+      </tr>
+    </thead>
+    <tbody>${satirlar}</tbody>
+  </table>
+</body>
+</html>`;
+
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 500);
+
+  } catch (e) { toast('Hata: ' + e.message, 'error'); }
+}
+
 // ─── MODAL ────────────────────────────────────────────────────────────────────
 function modalGoster(icerik) {
   const container = document.getElementById('modalContainer');
@@ -1832,10 +1980,13 @@ function toast(msg, tip = 'info', sure = 3500) {
 
 // ─── İÇDER'DEN AKTAR ─────────────────────────────────────────────────────────
 function topluVeAktarOrgDoldur() {
-  ['aktarOrgInput', 'topluOrgInput'].forEach(id => {
+  ['aktarOrgInput', 'topluOrgInput', 'yazdirilacakOrgInput'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
-    sel.innerHTML = '<option value="">Organizasyon seçin</option>';
+    const ilkSecenek = id === 'yazdirilacakOrgInput'
+      ? '<option value="">Tüm organizasyonlar</option>'
+      : '<option value="">Organizasyon seçin</option>';
+    sel.innerHTML = ilkSecenek;
     organizasyonlar.forEach(o => {
       const opt = document.createElement('option');
       opt.value = o.id;

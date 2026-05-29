@@ -457,6 +457,14 @@ router.get('/yedek-indir', adminKontrol, ac(async (req, res) => {
   res.sendFile(dbPath);
 }));
 
+// ─── İZLENMELERİ SIFIRLA ─────────────────────────────────────────────────────
+router.post('/izlenmeleri-sifirla', adminKontrol, ac(async (req, res) => {
+  const db = await getDb();
+  const sayac = db.prepare('SELECT COUNT(*) as c FROM izleme_loglari').get();
+  db.prepare('DELETE FROM izleme_loglari').run();
+  res.json({ ok: true, silinen: sayac?.c || 0 });
+}));
+
 // ─── İÇDER KURBAN ENTEGRASYONU ───────────────────────────────────────────────
 // İÇDER DB'sini oku — lokal dosya veya API üzerinden
 async function icderDbOku() {
