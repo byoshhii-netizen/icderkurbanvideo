@@ -1947,16 +1947,18 @@ async function bagisciListesiYazdir() {
     Object.values(gruplar).forEach(grup => {
       grup.sort((a, c) => (a.hisse_no || 1) - (c.hisse_no || 1));
       const grupBoyutu = grup.length;
-      grup.forEach(b => {
+      grup.forEach((b, idx) => {
         const etiketChipler = [b.etiket1, b.etiket2, b.etiket3, b.etiket4, b.etiket5, b.etiket6, b.etiket7]
           .filter(Boolean)
           .map(e => `<span class="etiket-chip">${escHtml(e)}</span>`)
           .join('') || '<span style="color:#5a8570">—</span>';
 
-        // Satır sınıfı: SMS + video = parlak yeşil, sadece video = normal yeşil, video yok = kırmızı
-        let satirSinif = 'video-yok';
-        if (b.sms_gonderildi && b.video_var) satirSinif = 'sms-ve-video-var';
-        else if (b.video_var) satirSinif = 'video-var';
+        let satirSinif = 'video-yok grup-satir';
+        if (b.sms_gonderildi && b.video_var) satirSinif = 'sms-ve-video-var grup-satir';
+        else if (b.video_var) satirSinif = 'video-var grup-satir';
+
+        if (idx === 0) satirSinif += ' grup-ilk';
+        if (idx === grupBoyutu - 1) satirSinif += ' grup-son';
 
         satirlar += `
           <tr class="${satirSinif}">
@@ -1965,10 +1967,10 @@ async function bagisciListesiYazdir() {
             <td class="col-tel">${escHtml(b.telefon || '—')}</td>
             <td>
               <span class="hisse-badge">${b.hisse_no || 1}. Hisse</span>
-              <span class="grup-badge">${grupBoyutu} Hisseli</span>
+              <span class="coklu-badge">Çoklu Hisse</span>
             </td>
             <td>${etiketChipler}</td>
-            <td style="font-size:10px;color:#5a8570;">${escHtml(b.organizasyon_adi || '')}</td>
+            <td><span class="video-sayi ${(b.izlenme_sayisi || 0) === 0 ? 'sifir' : ''}">${b.izlenme_sayisi || 0}</span></td>
             <td><span class="video-badge ${b.video_var ? 'var' : 'yok'}">${b.video_var ? '✓ Var' : '✗ Yok'}</span></td>
             <td><span class="video-sayi ${(b.video_sayisi || 0) === 0 ? 'sifir' : ''}">${b.video_sayisi || 0}</span></td>
             <td><span class="sms-badge-print ${b.sms_gonderildi ? 'sms-var' : 'sms-yok'}">${b.sms_gonderildi ? '✓ Gönderildi' : '— Bekliyor'}</span></td>
@@ -1992,9 +1994,9 @@ async function bagisciListesiYazdir() {
           <td class="col-sira">${sira++}</td>
           <td class="col-ad">${escHtml(b.ad)}</td>
           <td class="col-tel">${escHtml(b.telefon || '—')}</td>
-          <td><span class="tekil-badge">Tekil</span></td>
+          <td><span class="tekil-badge">Tekli Hisse</span></td>
           <td>${etiketChipler}</td>
-          <td style="font-size:10px;color:#5a8570;">${escHtml(b.organizasyon_adi || '')}</td>
+          <td><span class="video-sayi ${(b.izlenme_sayisi || 0) === 0 ? 'sifir' : ''}">${b.izlenme_sayisi || 0}</span></td>
           <td><span class="video-badge ${b.video_var ? 'var' : 'yok'}">${b.video_var ? '✓ Var' : '✗ Yok'}</span></td>
           <td><span class="video-sayi ${(b.video_sayisi || 0) === 0 ? 'sifir' : ''}">${b.video_sayisi || 0}</span></td>
           <td><span class="sms-badge-print ${b.sms_gonderildi ? 'sms-var' : 'sms-yok'}">${b.sms_gonderildi ? '✓ Gönderildi' : '— Bekliyor'}</span></td>
@@ -2134,12 +2136,39 @@ async function bagisciListesiYazdir() {
       border-radius: 20px; font-size: 9px; font-weight: 600;
       border: 1px solid rgba(251,191,36,0.25);
     }
+    .coklu-badge {
+      display: inline-block; margin-left: 3px; padding: 2px 6px;
+      background: rgba(251,191,36,0.12); color: #fbbf24;
+      border-radius: 20px; font-size: 9px; font-weight: 600;
+      border: 1px solid rgba(251,191,36,0.25);
+    }
     .tekil-badge {
       display: inline-block; padding: 2px 7px;
       background: rgba(90,133,112,0.15); color: var(--text3);
       border-radius: 20px; font-size: 10px; font-weight: 600;
       border: 1px solid rgba(90,133,112,0.25);
     }
+    /* ── GRUP ÇERÇEVELEMESİ ── */
+    tbody tr.grup-satir td {
+      border-top: none;
+      border-bottom: none;
+    }
+    tbody tr.grup-ilk td {
+      border-top: 2px solid rgba(251,191,36,0.5) !important;
+      padding-top: 8px;
+    }
+    tbody tr.grup-ilk td:first-child {
+      border-left: 3px solid #fbbf24;
+    }
+    tbody tr.grup-son td {
+      border-bottom: 2px solid rgba(251,191,36,0.5) !important;
+      padding-bottom: 8px;
+    }
+    tbody tr.grup-satir td:first-child {
+      border-left: 3px solid rgba(251,191,36,0.4);
+    }
+    tbody tr.grup-satir { border-bottom: 1px solid rgba(251,191,36,0.15); }
+    tbody tr.grup-son { border-bottom: 2px solid rgba(251,191,36,0.5) !important; margin-bottom: 4px; }
     .etiket-chip {
       display: inline-block; padding: 1px 5px;
       background: var(--bg4); color: var(--text2);
@@ -2245,7 +2274,7 @@ async function bagisciListesiYazdir() {
           <th>Telefon</th>
           <th>Hisse</th>
           <th>Etiketler</th>
-          <th>Organizasyon</th>
+          <th>Görüldü</th>
           <th>Video</th>
           <th>Adet</th>
           <th>SMS</th>
