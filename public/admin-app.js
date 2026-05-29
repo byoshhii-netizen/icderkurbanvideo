@@ -1832,36 +1832,40 @@ async function bagisciListesiYazdir() {
     Object.values(gruplar).forEach(grup => {
       grup.sort((a, c) => (a.hisse_no || 1) - (c.hisse_no || 1));
       grup.forEach(b => {
-        const etiketler = [b.etiket1, b.etiket2, b.etiket3, b.etiket4, b.etiket5, b.etiket6, b.etiket7]
-          .filter(Boolean).join(', ');
+        const etiketChipler = [b.etiket1, b.etiket2, b.etiket3, b.etiket4, b.etiket5, b.etiket6, b.etiket7]
+          .filter(Boolean)
+          .map(e => `<span class="etiket-chip">${escHtml(e)}</span>`)
+          .join('') || '<span style="color:#9ca3af">—</span>';
         satirlar += `
           <tr class="${b.video_var ? 'video-var' : 'video-yok'}">
-            <td>${sira++}</td>
-            <td>${escHtml(b.ad)}</td>
-            <td>${escHtml(b.telefon || '-')}</td>
-            <td style="text-align:center;">${b.hisse_no || 1}. Hisse</td>
-            <td>${escHtml(etiketler || '-')}</td>
-            <td>${escHtml(b.organizasyon_adi || '')}</td>
-            <td style="text-align:center;">${b.video_var ? '✅' : '❌'}</td>
-            <td style="text-align:center;">${b.video_sayisi || 0}</td>
+            <td class="sira">${sira++}</td>
+            <td class="ad">${escHtml(b.ad)}</td>
+            <td class="tel">${escHtml(b.telefon || '—')}</td>
+            <td><span class="hisse-badge">${b.hisse_no || 1}. Hisse</span></td>
+            <td>${etiketChipler}</td>
+            <td style="font-size:10px;color:#6b7280;">${escHtml(b.organizasyon_adi || '')}</td>
+            <td><span class="video-badge ${b.video_var ? 'var' : 'yok'}">${b.video_var ? '✅ Var' : '❌ Yok'}</span></td>
+            <td><span class="video-sayi ${(b.video_sayisi || 0) === 0 ? 'sifir' : ''}">${b.video_sayisi || 0}</span></td>
           </tr>`;
       });
     });
 
     // Tekiller
     tekiller.forEach(b => {
-      const etiketler = [b.etiket1, b.etiket2, b.etiket3, b.etiket4, b.etiket5, b.etiket6, b.etiket7]
-        .filter(Boolean).join(', ');
+      const etiketChipler = [b.etiket1, b.etiket2, b.etiket3, b.etiket4, b.etiket5, b.etiket6, b.etiket7]
+        .filter(Boolean)
+        .map(e => `<span class="etiket-chip">${escHtml(e)}</span>`)
+        .join('') || '<span style="color:#9ca3af">—</span>';
       satirlar += `
         <tr class="${b.video_var ? 'video-var' : 'video-yok'}">
-          <td>${sira++}</td>
-          <td>${escHtml(b.ad)}</td>
-          <td>${escHtml(b.telefon || '-')}</td>
-          <td style="text-align:center;">-</td>
-          <td>${escHtml(etiketler || '-')}</td>
-          <td>${escHtml(b.organizasyon_adi || '')}</td>
-          <td style="text-align:center;">${b.video_var ? '✅' : '❌'}</td>
-          <td style="text-align:center;">${b.video_sayisi || 0}</td>
+          <td class="sira">${sira++}</td>
+          <td class="ad">${escHtml(b.ad)}</td>
+          <td class="tel">${escHtml(b.telefon || '—')}</td>
+          <td><span style="color:#9ca3af;font-size:10px;">—</span></td>
+          <td>${etiketChipler}</td>
+          <td style="font-size:10px;color:#6b7280;">${escHtml(b.organizasyon_adi || '')}</td>
+          <td><span class="video-badge ${b.video_var ? 'var' : 'yok'}">${b.video_var ? '✅ Var' : '❌ Yok'}</span></td>
+          <td><span class="video-sayi ${(b.video_sayisi || 0) === 0 ? 'sifir' : ''}">${b.video_sayisi || 0}</span></td>
         </tr>`;
     });
 
@@ -1874,50 +1878,252 @@ async function bagisciListesiYazdir() {
   <meta charset="UTF-8">
   <title>${orgAd}Bağışçı Listesi</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: #fff; padding: 16px; }
-    h1 { font-size: 16px; margin-bottom: 4px; }
-    .meta { font-size: 11px; color: #555; margin-bottom: 12px; }
-    .ozet { display: flex; gap: 20px; margin-bottom: 14px; font-size: 11px; }
-    .ozet span { padding: 4px 10px; border-radius: 4px; font-weight: 600; }
-    .ozet .toplam { background: #e8f5ee; color: #0a7a4a; }
-    .ozet .var { background: #d1fae5; color: #065f46; }
-    .ozet .yok { background: #fee2e2; color: #991b1b; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      font-size: 11.5px;
+      color: #1a1a2e;
+      background: #f8fafc;
+      padding: 28px 32px;
+      line-height: 1.5;
+    }
+
+    /* ── HEADER ── */
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #10b981;
+    }
+    .page-header-left h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #0a1410;
+      letter-spacing: -0.3px;
+    }
+    .page-header-left p {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 3px;
+    }
+    .page-header-right {
+      text-align: right;
+      font-size: 11px;
+      color: #6b7280;
+    }
+    .page-header-right strong {
+      display: block;
+      font-size: 13px;
+      color: #10b981;
+      font-weight: 700;
+    }
+
+    /* ── ÖZET KARTLAR ── */
+    .ozet {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .ozet-kart {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ozet-kart .icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .ozet-kart .deger { font-size: 22px; font-weight: 800; line-height: 1; }
+    .ozet-kart .etiket { font-size: 10px; color: #6b7280; margin-top: 2px; font-weight: 500; }
+
+    .ozet-kart.toplam { background: #f0fdf4; border: 1px solid #bbf7d0; }
+    .ozet-kart.toplam .icon { background: #d1fae5; }
+    .ozet-kart.toplam .deger { color: #065f46; }
+
+    .ozet-kart.var { background: #ecfdf5; border: 1px solid #6ee7b7; }
+    .ozet-kart.var .icon { background: #a7f3d0; }
+    .ozet-kart.var .deger { color: #047857; }
+
+    .ozet-kart.yok { background: #fff5f5; border: 1px solid #fecaca; }
+    .ozet-kart.yok .icon { background: #fee2e2; }
+    .ozet-kart.yok .deger { color: #b91c1c; }
+
+    /* ── TABLO ── */
+    .tablo-wrap {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+
     table { width: 100%; border-collapse: collapse; }
-    th { background: #1d3529; color: #fff; padding: 7px 8px; text-align: left; font-size: 10px; }
-    td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
-    tr.video-var td { background: #f0fdf4; }
-    tr.video-yok td { background: #fff5f5; }
-    tr:hover td { filter: brightness(0.97); }
+
+    thead tr {
+      background: linear-gradient(135deg, #0f2d1f 0%, #1d4a30 100%);
+    }
+    thead th {
+      color: #a7f3d0;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 10px 12px;
+      text-align: left;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    thead th:first-child { border-radius: 0; }
+
+    tbody tr { border-bottom: 1px solid #f3f4f6; transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+
+    tbody tr.video-var td { background: #f0fdf4; }
+    tbody tr.video-yok td { background: #fff8f8; }
+
+    tbody td {
+      padding: 8px 12px;
+      color: #374151;
+      vertical-align: middle;
+      font-size: 11px;
+    }
+
+    .sira { color: #9ca3af; font-size: 10px; font-weight: 600; width: 28px; }
+    .ad { font-weight: 600; color: #111827; }
+    .tel { font-family: 'Courier New', monospace; font-size: 10.5px; color: #374151; }
+    .hisse-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #e0f2fe;
+      color: #0369a1;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .etiket-chip {
+      display: inline-block;
+      padding: 1px 6px;
+      background: #f3f4f6;
+      color: #4b5563;
+      border-radius: 4px;
+      font-size: 10px;
+      margin: 1px;
+    }
+    .video-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .video-badge.var { background: #d1fae5; color: #065f46; }
+    .video-badge.yok { background: #fee2e2; color: #991b1b; }
+    .video-sayi {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      background: #10b981;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .video-sayi.sifir { background: #e5e7eb; color: #9ca3af; }
+
+    /* ── FOOTER ── */
+    .page-footer {
+      margin-top: 16px;
+      text-align: center;
+      font-size: 10px;
+      color: #9ca3af;
+    }
+
+    /* ── PRINT ── */
     @media print {
-      body { padding: 0; }
-      @page { margin: 12mm; size: A4 landscape; }
+      body { background: #fff; padding: 0; }
+      .tablo-wrap { box-shadow: none; border: 1px solid #d1d5db; }
+      @page { margin: 10mm 12mm; size: A4 landscape; }
+      thead { display: table-header-group; }
+      tbody tr { page-break-inside: avoid; }
     }
   </style>
 </head>
 <body>
-  <h1>📋 ${orgAd}Bağışçı Listesi</h1>
-  <div class="meta">Yazdırma tarihi: ${tarih} — Toplam: ${bagiscilar.length} bağışçı</div>
-  <div class="ozet">
-    <span class="toplam">Toplam: ${bagiscilar.length}</span>
-    <span class="var">✅ Video Var: ${videoVar}</span>
-    <span class="yok">❌ Video Yok: ${videoYok}</span>
+
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1>Bağışçı Listesi</h1>
+      <p>${orgAd ? orgAd.replace(' — ', '') : 'Tüm Organizasyonlar'}</p>
+    </div>
+    <div class="page-header-right">
+      <strong>${bagiscilar.length} Bağışçı</strong>
+      ${tarih}
+    </div>
   </div>
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Ad Soyad</th>
-        <th>Telefon</th>
-        <th>Hisse</th>
-        <th>Etiketler</th>
-        <th>Organizasyon</th>
-        <th>Video</th>
-        <th>Video Sayısı</th>
-      </tr>
-    </thead>
-    <tbody>${satirlar}</tbody>
-  </table>
+
+  <div class="ozet">
+    <div class="ozet-kart toplam">
+      <div class="icon">👥</div>
+      <div>
+        <div class="deger">${bagiscilar.length}</div>
+        <div class="etiket">Toplam Bağışçı</div>
+      </div>
+    </div>
+    <div class="ozet-kart var">
+      <div class="icon">✅</div>
+      <div>
+        <div class="deger">${videoVar}</div>
+        <div class="etiket">Video Var</div>
+      </div>
+    </div>
+    <div class="ozet-kart yok">
+      <div class="icon">❌</div>
+      <div>
+        <div class="deger">${videoYok}</div>
+        <div class="etiket">Video Yok</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tablo-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Ad Soyad</th>
+          <th>Telefon</th>
+          <th>Hisse</th>
+          <th>Etiketler</th>
+          <th>Organizasyon</th>
+          <th>Video Durumu</th>
+          <th>Video Sayısı</th>
+        </tr>
+      </thead>
+      <tbody>${satirlar}</tbody>
+    </table>
+  </div>
+
+  <div class="page-footer">
+    İÇDER Kurban Videoları — ${tarih} tarihinde oluşturuldu
+  </div>
+
 </body>
 </html>`;
 
