@@ -589,6 +589,7 @@ async function bagiscilarYukle() {
   const orgId = document.getElementById('bagisciOrgFilter')?.value || '';
   const videoDurum = document.getElementById('bagisciVideoDurum')?.value || '';
   const q = document.getElementById('bagisciArama')?.value?.trim() || '';
+  const grupTur = document.getElementById('bagisciGrupTur')?.value || ''; // 'tumu' | 'gruplu' | 'tekil'
   const tbody = document.getElementById('bagisciTableBody');
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px;"><div class="spinner" style="margin:auto;"></div></td></tr>';
@@ -598,8 +599,16 @@ async function bagiscilarYukle() {
     if (videoDurum) params.set('video_durum', videoDurum);
     if (q) params.set('q', q);
     const r = await fetch('/api/admin/bagiscilar?' + params.toString());
-    const bagiscilar = await r.json();
+    let bagiscilar = await r.json();
     tbody.innerHTML = '';
+
+    // Grup türü filtresi (frontend'de)
+    if (grupTur === 'gruplu') {
+      bagiscilar = bagiscilar.filter(b => !!b.grup_id);
+    } else if (grupTur === 'tekil') {
+      bagiscilar = bagiscilar.filter(b => !b.grup_id);
+    }
+
     if (bagiscilar.length === 0) {
       tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text3); padding:24px;">Bağışçı bulunamadı</td></tr>';
       return;
