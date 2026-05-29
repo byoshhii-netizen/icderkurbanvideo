@@ -1969,8 +1969,8 @@ async function bagisciListesiYazdir() {
               <span class="hisse-badge">${b.hisse_no || 1}. Hisse</span>
               <span class="coklu-badge">Çoklu Hisse</span>
             </td>
-            <td>${etiketChipler}</td>
             <td><span class="video-sayi ${(b.izlenme_sayisi || 0) === 0 ? 'sifir' : ''}">${b.izlenme_sayisi || 0}</span></td>
+            <td>${etiketChipler}</td>
             <td><span class="video-badge ${b.video_var ? 'var' : 'yok'}">${b.video_var ? '✓ Var' : '✗ Yok'}</span></td>
             <td><span class="video-sayi ${(b.video_sayisi || 0) === 0 ? 'sifir' : ''}">${b.video_sayisi || 0}</span></td>
             <td><span class="sms-badge-print ${b.sms_gonderildi ? 'sms-var' : 'sms-yok'}">${b.sms_gonderildi ? '✓ Gönderildi' : '— Bekliyor'}</span></td>
@@ -1995,8 +1995,8 @@ async function bagisciListesiYazdir() {
           <td class="col-ad">${escHtml(b.ad)}</td>
           <td class="col-tel">${escHtml(b.telefon || '—')}</td>
           <td><span class="tekil-badge">Tekli Hisse</span></td>
-          <td>${etiketChipler}</td>
           <td><span class="video-sayi ${(b.izlenme_sayisi || 0) === 0 ? 'sifir' : ''}">${b.izlenme_sayisi || 0}</span></td>
+          <td>${etiketChipler}</td>
           <td><span class="video-badge ${b.video_var ? 'var' : 'yok'}">${b.video_var ? '✓ Var' : '✗ Yok'}</span></td>
           <td><span class="video-sayi ${(b.video_sayisi || 0) === 0 ? 'sifir' : ''}">${b.video_sayisi || 0}</span></td>
           <td><span class="sms-badge-print ${b.sms_gonderildi ? 'sms-var' : 'sms-yok'}">${b.sms_gonderildi ? '✓ Gönderildi' : '— Bekliyor'}</span></td>
@@ -2273,8 +2273,8 @@ async function bagisciListesiYazdir() {
           <th>Ad Soyad</th>
           <th>Telefon</th>
           <th>Hisse</th>
-          <th>Etiketler</th>
           <th>Görüldü</th>
+          <th>Etiketler</th>
           <th>Video</th>
           <th>Adet</th>
           <th>SMS</th>
