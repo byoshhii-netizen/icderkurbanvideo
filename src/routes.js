@@ -102,7 +102,7 @@ router.get('/ara', ac(async (req, res) => {
   if (!q || q.trim().length < 1) return res.json({ sonuclar: [] });
 
   const db = await getDb();
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+  const ip = req.ip || req.socket.remoteAddress || '';
   const ua = req.headers['user-agent'] || '';
 
   // İsimle arama ayarını oku
@@ -246,7 +246,7 @@ router.get('/ara', ac(async (req, res) => {
 // ─── VİDEO İZLEME LOGU ───────────────────────────────────────────────────────
 router.post('/izleme-log', ac(async (req, res) => {
   const { video_id, bagisci_id, aranan_isim } = req.body;
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+  const ip = req.ip || req.socket.remoteAddress || '';
   const ua = req.headers['user-agent'] || '';
   const db = await getDb();
   try {

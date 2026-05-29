@@ -38,7 +38,8 @@ app.use(session({
 }));
 
 // Railway proxy arkasında çalışırken gerçek IP ve HTTPS için
-app.set('trust proxy', 1);
+// true = tüm proxy zincirini güven, x-forwarded-for'daki ilk (gerçek) IP'yi al
+app.set('trust proxy', true);
 
 // ─── HEALTHCHECK — Railway bunu kullanır ─────────────────────────────────────
 app.get('/health', (req, res) => {
