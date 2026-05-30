@@ -451,6 +451,23 @@ router.get('/ayarlar', adminKontrol, ac(async (req, res) => {
   res.json(ayarlar);
 }));
 
+// ─── İSTİSNA IP LİSTESİ ──────────────────────────────────────────────────────
+router.get('/istisna-ipler', adminKontrol, ac(async (req, res) => {
+  const db = await getDb();
+  const row = db.prepare("SELECT deger FROM sistem_ayarlari WHERE anahtar='istisna_ipler'").get();
+  const liste = row?.deger ? row.deger.split(',').map(s => s.trim()).filter(Boolean) : [];
+  res.json({ liste });
+}));
+
+router.post('/istisna-ipler', adminKontrol, ac(async (req, res) => {
+  const { liste } = req.body; // string[] bekleniyor
+  if (!Array.isArray(liste)) return res.status(400).json({ hata: 'liste dizisi gerekli' });
+  const deger = liste.map(s => s.trim()).filter(Boolean).join(',');
+  const db = await getDb();
+  db.prepare("INSERT INTO sistem_ayarlari (anahtar, deger) VALUES ('istisna_ipler', ?) ON CONFLICT(anahtar) DO UPDATE SET deger=excluded.deger").run(deger);
+  res.json({ ok: true });
+}));
+
 // ─── DB YEDEK İNDİR ──────────────────────────────────────────────────────────
 router.get('/yedek-indir', adminKontrol, ac(async (req, res) => {
   const fs = require('fs');
@@ -470,9 +487,31 @@ router.get('/yedek-indir', adminKontrol, ac(async (req, res) => {
 
 // ─── İZLENMELERİ SIFIRLA ─────────────────────────────────────────────────────
 router.post('/izlenmeleri-sifirla', adminKontrol, ac(async (req, res) => {
+  const { baslangic, bitis } = req.body || {};
   const db = await getDb();
-  const sayac = db.prepare('SELECT COUNT(*) as c FROM izleme_loglari').get();
-  db.prepare('DELETE FROM izleme_loglari').run();
+  let sayac, silme;
+  if (baslangic && bitis) {
+    sayac = db.prepare('SELECT COUNT(*) as c FROM izleme_loglari WHERE tarih >= ? AND tarih <= ?').get(baslangic, bitis);
+    silme = db.prepare('DELETE FROM izleme_loglari WHERE tarih >= ? AND tarih <= ?').run(baslangic, bitis);
+  } else {
+    sayac = db.prepare('SELECT COUNT(*) as c FROM izleme_loglari').get();
+    silme = db.prepare('DELETE FROM izleme_loglari').run();
+  }
+  res.json({ ok: true, silinen: sayac?.c || 0 });
+}));
+
+// ─── TEK BAĞIŞÇI İZLENMELERİNİ SIFIRLA ──────────────────────────────────────
+router.post('/bagiscilar/:id/izlenmeleri-sifirla', adminKontrol, ac(async (req, res) => {
+  const { baslangic, bitis } = req.body || {};
+  const db = await getDb();
+  let sayac;
+  if (baslangic && bitis) {
+    sayac = db.prepare('SELECT COUNT(*) as c FROM izleme_loglari WHERE bagisci_id=? AND tarih >= ? AND tarih <= ?').get(req.params.id, baslangic, bitis);
+    db.prepare('DELETE FROM izleme_loglari WHERE bagisci_id=? AND tarih >= ? AND tarih <= ?').run(req.params.id, baslangic, bitis);
+  } else {
+    sayac = db.prepare('SELECT COUNT(*) as c FROM izleme_loglari WHERE bagisci_id=?').get(req.params.id);
+    db.prepare('DELETE FROM izleme_loglari WHERE bagisci_id=?').run(req.params.id);
+  }
   res.json({ ok: true, silinen: sayac?.c || 0 });
 }));
 

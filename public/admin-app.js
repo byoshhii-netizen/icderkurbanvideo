@@ -111,6 +111,13 @@ async function ayarlariYukle() {
       const inp = document.getElementById('varsayilanVideoBaslikInput');
       if (inp) inp.value = d.varsayilan_video_basligi || '';
     }
+    // İstisna IP listesini yükle
+    try {
+      const ir = await fetch('/api/admin/istisna-ipler');
+      const id = await ir.json();
+      const ta = document.getElementById('istisnaIpInput');
+      if (ta) ta.value = (id.liste || []).join('\n');
+    } catch (_) {}
   } catch (e) {}
 }
 
@@ -767,6 +774,10 @@ function _bagisciSatirHtml(b) {
             : '<i class="fas fa-sms"></i> SMS Gönder'
           }
         </button>
+        ${b.izlenme_sayisi > 0
+          ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="bagisciIzlenmeSifirla(${b.id})" title="İzlenmeleri Sıfırla" style="color:var(--yellow);"><i class="fas fa-eye-slash"></i></button>`
+          : ''
+        }
         <button class="btn btn-danger btn-sm btn-icon" onclick="bagisciSil(${b.id})" title="Sil"><i class="fas fa-trash"></i></button>
       </div>
     </td>
@@ -1203,6 +1214,98 @@ async function smsDurumToggle(bagisciId, mevcutDurum) {
     if (btn) { btn.disabled = false; }
     toast('Bağlantı hatası', 'error');
   }
+}
+
+// ─── İZLENME SIFIRLAMA MODAL YARDIMCISI ──────────────────────────────────────
+function _izlenmeSifirlaModal({ baslik, onTumu, onAralik }) {
+  const simdi = new Date();
+  const bugun = simdi.toISOString().slice(0, 16); // datetime-local formatı
+  const birSaatOnce = new Date(simdi - 3600000).toISOString().slice(0, 16);
+
+  modalGoster(`
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-eye-slash" style="color:var(--yellow)"></i> ${baslik}</div>
+      <button class="modal-close" onclick="modalKapat()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" style="padding:20px;">
+      <div style="display:flex; flex-direction:column; gap:12px;">
+
+        <button class="btn btn-danger" onclick="(${onTumu.toString()})(); modalKapat();">
+          <i class="fas fa-trash-alt"></i> Tüm İzlenmeleri Sıfırla
+        </button>
+
+        <div style="border-top:1px solid var(--border); padding-top:12px;">
+          <div style="font-size:0.85rem; font-weight:600; color:var(--text2); margin-bottom:10px;">
+            <i class="fas fa-clock"></i> Tarih/Saat Aralığı Seç
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:0.75rem;">Başlangıç</label>
+              <input type="datetime-local" class="form-input" id="sifirlaBaslangic" value="${birSaatOnce}">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:0.75rem;">Bitiş</label>
+              <input type="datetime-local" class="form-input" id="sifirlaBaslangicBitis" value="${bugun}">
+            </div>
+          </div>
+          <button class="btn btn-warning" style="background:var(--yellow);color:#000;border:none;" onclick="
+            const b = document.getElementById('sifirlaBaslangic')?.value;
+            const e = document.getElementById('sifirlaBaslangicBitis')?.value;
+            if (!b || !e) { toast('Tarih aralığı seçin', 'error'); return; }
+            if (b >= e) { toast('Başlangıç bitiş tarihinden önce olmalı', 'error'); return; }
+            (${onAralik.toString()})(b + ':00', e + ':00'); modalKapat();
+          ">
+            <i class="fas fa-filter"></i> Seçili Aralığı Sıfırla
+          </button>
+        </div>
+
+      </div>
+    </div>
+  `);
+}
+
+async function bagisciIzlenmeSifirla(id) {
+  _izlenmeSifirlaModal({
+    baslik: 'İzlenmeleri Sıfırla',
+    onTumu: async () => {
+      try {
+        const r = await fetch(`/api/admin/bagiscilar/${id}/izlenmeleri-sifirla`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        const d = await r.json();
+        if (d.ok) { toast(`${d.silinen} izlenme kaydı silindi`, 'success'); bagiscilarYukle(); }
+        else toast(d.hata || 'Hata', 'error');
+      } catch (e) { toast('Bağlantı hatası', 'error'); }
+    },
+    onAralik: async (baslangic, bitis) => {
+      try {
+        const r = await fetch(`/api/admin/bagiscilar/${id}/izlenmeleri-sifirla`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ baslangic, bitis }) });
+        const d = await r.json();
+        if (d.ok) { toast(`${d.silinen} izlenme kaydı silindi`, 'success'); bagiscilarYukle(); }
+        else toast(d.hata || 'Hata', 'error');
+      } catch (e) { toast('Bağlantı hatası', 'error'); }
+    }
+  });
+}
+
+async function goruntulenmeSifirla() {
+  _izlenmeSifirlaModal({
+    baslik: 'Tüm İzlenmeleri Sıfırla',
+    onTumu: async () => {
+      try {
+        const r = await fetch('/api/admin/izlenmeleri-sifirla', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        const d = await r.json();
+        if (d.ok) { toast(`${d.silinen} izlenme kaydı silindi`, 'success'); dashboardYukle(); }
+        else toast(d.hata || 'Hata', 'error');
+      } catch (e) { toast('Bağlantı hatası', 'error'); }
+    },
+    onAralik: async (baslangic, bitis) => {
+      try {
+        const r = await fetch('/api/admin/izlenmeleri-sifirla', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ baslangic, bitis }) });
+        const d = await r.json();
+        if (d.ok) { toast(`${d.silinen} izlenme kaydı silindi`, 'success'); dashboardYukle(); }
+        else toast(d.hata || 'Hata', 'error');
+      } catch (e) { toast('Bağlantı hatası', 'error'); }
+    }
+  });
 }
 
 async function bagisciSil(id) {
@@ -1854,6 +1957,26 @@ function _isimAramaUiGuncelle(aktif) {
   }
 }
 
+async function istisnaIpKaydet() {
+  const ta = document.getElementById('istisnaIpInput');
+  const durum = document.getElementById('istisnaIpDurum');
+  const liste = (ta?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  try {
+    const r = await fetch('/api/admin/istisna-ipler', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ liste })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast('İstisna IP listesi kaydedildi', 'success');
+      if (durum) durum.textContent = `${liste.length} IP kayıtlı`;
+    } else {
+      toast(d.hata || 'Hata', 'error');
+    }
+  } catch (e) { toast('Bağlantı hatası', 'error'); }
+}
+
 async function sifreDegistir() {
   const mevcut = document.getElementById('mevcutSifre')?.value;
   const yeni = document.getElementById('yeniSifre')?.value;
@@ -1870,18 +1993,6 @@ async function sifreDegistir() {
       toast('Şifre değiştirildi', 'success');
       document.getElementById('mevcutSifre').value = '';
       document.getElementById('yeniSifre').value = '';
-    } else toast(d.hata || 'Hata', 'error');
-  } catch (e) { toast('Bağlantı hatası', 'error'); }
-}
-
-async function goruntulenmeSifirla() {
-  if (!confirm('Tüm izlenme kayıtları silinecek! Bu işlem geri alınamaz. Emin misiniz?')) return;
-  try {
-    const r = await fetch('/api/admin/izlenmeleri-sifirla', { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) {
-      toast(`${d.silinen} izlenme kaydı silindi`, 'success');
-      dashboardYukle();
     } else toast(d.hata || 'Hata', 'error');
   } catch (e) { toast('Bağlantı hatası', 'error'); }
 }

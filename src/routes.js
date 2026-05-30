@@ -4,6 +4,18 @@ const { getDb } = require('./database');
 // ─── ASYNC HATA SARMALAYICI ───────────────────────────────────────────────────
 const ac = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
+// ─── İSTİSNA IP KONTROLÜ ─────────────────────────────────────────────────────
+function istisnaMi(db, ip) {
+  try {
+    const row = db.prepare("SELECT deger FROM sistem_ayarlari WHERE anahtar='istisna_ipler'").get();
+    if (!row?.deger) return false;
+    const liste = row.deger.split(',').map(s => s.trim()).filter(Boolean);
+    // IPv6 mapped IPv4 desteği: ::ffff:1.2.3.4 → 1.2.3.4
+    const temizIp = (ip || '').replace(/^::ffff:/, '');
+    return liste.some(k => temizIp === k || temizIp.startsWith(k));
+  } catch (_) { return false; }
+}
+
 // ─── YARDIMCI: Türkçe karakter normalize ─────────────────────────────────────
 function normalizeTR(str) {
   if (!str) return '';
@@ -152,8 +164,9 @@ router.get('/ara', ac(async (req, res) => {
     if (!queryRakamMi) {
       // Numara değil → hiç sonuç dönme
       try {
-        db.prepare('INSERT INTO izleme_loglari (video_id, bagisci_id, aranan_isim, ip_adresi, user_agent) VALUES (NULL, NULL, ?, ?, ?)')
-          .run(query, ip, ua);
+        if (!istisnaMi(db, ip))
+          db.prepare('INSERT INTO izleme_loglari (video_id, bagisci_id, aranan_isim, ip_adresi, user_agent) VALUES (NULL, NULL, ?, ?, ?)')
+            .run(query, ip, ua);
       } catch (_) {}
       return res.json({ sonuclar: [] });
     }
@@ -172,8 +185,9 @@ router.get('/ara', ac(async (req, res) => {
     });
 
     try {
-      db.prepare('INSERT INTO izleme_loglari (video_id, bagisci_id, aranan_isim, ip_adresi, user_agent) VALUES (NULL, NULL, ?, ?, ?)')
-        .run(query, ip, ua);
+      if (!istisnaMi(db, ip))
+        db.prepare('INSERT INTO izleme_loglari (video_id, bagisci_id, aranan_isim, ip_adresi, user_agent) VALUES (NULL, NULL, ?, ?, ?)')
+          .run(query, ip, ua);
     } catch (_) {}
 
     return res.json({ sonuclar: telefonSonuclar.slice(0, 50) });
@@ -236,8 +250,9 @@ router.get('/ara', ac(async (req, res) => {
 
   // Arama logu — hata olsa bile sonuç dön
   try {
-    db.prepare('INSERT INTO izleme_loglari (video_id, bagisci_id, aranan_isim, ip_adresi, user_agent) VALUES (NULL, NULL, ?, ?, ?)')
-      .run(query, ip, ua);
+    if (!istisnaMi(db, ip))
+      db.prepare('INSERT INTO izleme_loglari (video_id, bagisci_id, aranan_isim, ip_adresi, user_agent) VALUES (NULL, NULL, ?, ?, ?)')
+        .run(query, ip, ua);
   } catch (_) {}
 
   res.json({ sonuclar: skorlu.slice(0, 50) });
@@ -250,8 +265,9 @@ router.post('/izleme-log', ac(async (req, res) => {
   const ua = req.headers['user-agent'] || '';
   const db = await getDb();
   try {
-    db.prepare('INSERT INTO izleme_loglari (video_id, bagisci_id, aranan_isim, ip_adresi, user_agent) VALUES (?, ?, ?, ?, ?)')
-      .run(video_id || null, bagisci_id || null, aranan_isim || null, ip, ua);
+    if (!istisnaMi(db, ip))
+      db.prepare('INSERT INTO izleme_loglari (video_id, bagisci_id, aranan_isim, ip_adresi, user_agent) VALUES (?, ?, ?, ?, ?)')
+        .run(video_id || null, bagisci_id || null, aranan_isim || null, ip, ua);
   } catch (_) {}
   res.json({ ok: true });
 }));
