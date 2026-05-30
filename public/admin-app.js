@@ -1951,7 +1951,7 @@ async function bagisciListesiYazdir() {
         const etiketChipler = [b.etiket1, b.etiket2, b.etiket3, b.etiket4, b.etiket5, b.etiket6, b.etiket7]
           .filter(Boolean)
           .map(e => `<span class="etiket-chip">${escHtml(e)}</span>`)
-          .join('') || '<span style="color:#5a8570">—</span>';
+          .join('') || '<span style="color:#9ca3af">—</span>';
 
         let satirSinif = 'video-yok grup-satir';
         if (b.sms_gonderildi && b.video_var) satirSinif = 'sms-ve-video-var grup-satir';
@@ -1983,7 +1983,7 @@ async function bagisciListesiYazdir() {
       const etiketChipler = [b.etiket1, b.etiket2, b.etiket3, b.etiket4, b.etiket5, b.etiket6, b.etiket7]
         .filter(Boolean)
         .map(e => `<span class="etiket-chip">${escHtml(e)}</span>`)
-        .join('') || '<span style="color:#5a8570">—</span>';
+        .join('') || '<span style="color:#9ca3af">—</span>';
 
       let satirSinif = 'video-yok';
       if (b.sms_gonderildi && b.video_var) satirSinif = 'sms-ve-video-var';
@@ -2017,19 +2017,19 @@ async function bagisciListesiYazdir() {
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg:      #0a1410;
-      --bg2:     #0f1e18;
-      --bg3:     #152820;
-      --bg4:     #1d3529;
-      --bg5:     #254232;
-      --border:  #2a4a38;
-      --accent:  #10b981;
-      --accent2: #34d399;
-      --red:     #ef4444;
-      --yellow:  #fbbf24;
-      --text:    #e8f5ee;
-      --text2:   #a8c9b8;
-      --text3:   #5a8570;
+      --bg:      #ffffff;
+      --bg2:     #f8f9fa;
+      --bg3:     #f1f5f2;
+      --bg4:     #e8f0eb;
+      --bg5:     #dde8e1;
+      --border:  #c8d8cc;
+      --accent:  #0d9668;
+      --accent2: #059652;
+      --red:     #dc2626;
+      --yellow:  #d97706;
+      --text:    #111827;
+      --text2:   #374151;
+      --text3:   #6b7280;
     }
     body {
       font-family: 'Inter', Arial, sans-serif;
@@ -2084,16 +2084,16 @@ async function bagisciListesiYazdir() {
     .ozet-kart .icon-box svg { width: 17px; height: 17px; }
     .ozet-kart .deger { font-size: 22px; font-weight: 800; line-height: 1; }
     .ozet-kart .etiket { font-size: 9.5px; color: var(--text3); margin-top: 3px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; }
-    .ozet-kart.toplam .icon-box { background: rgba(16,185,129,0.15); }
-    .ozet-kart.toplam .deger { color: var(--accent); }
-    .ozet-kart.var .icon-box { background: rgba(16,185,129,0.1); }
-    .ozet-kart.var .deger { color: var(--accent2); }
-    .ozet-kart.yok .icon-box { background: rgba(239,68,68,0.12); }
-    .ozet-kart.yok .deger { color: var(--red); }
-    .ozet-kart.sms-ok .icon-box { background: rgba(16,185,129,0.2); }
-    .ozet-kart.sms-ok .deger { color: #34d399; }
-    .ozet-kart.sms-bek .icon-box { background: rgba(251,191,36,0.12); }
-    .ozet-kart.sms-bek .deger { color: var(--yellow); }
+    .ozet-kart.toplam .icon-box { background: rgba(13,150,104,0.12); }
+    .ozet-kart.toplam .deger { color: #065f46; }
+    .ozet-kart.var .icon-box { background: rgba(13,150,104,0.1); }
+    .ozet-kart.var .deger { color: #0d9668; }
+    .ozet-kart.yok .icon-box { background: rgba(220,38,38,0.1); }
+    .ozet-kart.yok .deger { color: #dc2626; }
+    .ozet-kart.sms-ok .icon-box { background: rgba(13,150,104,0.15); }
+    .ozet-kart.sms-ok .deger { color: #065f46; }
+    .ozet-kart.sms-bek .icon-box { background: rgba(217,119,6,0.1); }
+    .ozet-kart.sms-bek .deger { color: #92400e; }
     .tablo-wrap {
       background: var(--bg2);
       border-radius: 12px;
@@ -2112,13 +2112,13 @@ async function bagisciListesiYazdir() {
     tbody tr:last-child { border-bottom: none; }
 
     /* ── SATIR RENKLERİ ── */
-    tbody tr.video-var td { background: rgba(16,185,129,0.06); }
-    tbody tr.video-yok td { background: rgba(239,68,68,0.05); }
+    tbody tr.video-var td { background: rgba(13,150,104,0.06); }
+    tbody tr.video-yok td { background: rgba(220,38,38,0.04); }
     /* SMS + Video var = parlak yeşil arka plan */
     tbody tr.sms-ve-video-var td {
-      background: rgba(16,185,129,0.18) !important;
+      background: rgba(13,150,104,0.12) !important;
     }
-    tbody tr.sms-ve-video-var { border-left: 3px solid #10b981; }
+    tbody tr.sms-ve-video-var { border-left: 3px solid #0d9668; }
 
     tbody td { padding: 7px 10px; color: var(--text2); vertical-align: middle; font-size: 11px; }
     .col-sira { color: var(--text3); font-size: 10px; font-weight: 600; }
@@ -2126,27 +2126,27 @@ async function bagisciListesiYazdir() {
     .col-tel { font-family: 'Courier New', monospace; font-size: 10.5px; color: var(--text2); }
     .hisse-badge {
       display: inline-block; padding: 2px 7px;
-      background: rgba(16,185,129,0.15); color: var(--accent);
+      background: rgba(13,150,104,0.12); color: #065f46;
       border-radius: 20px; font-size: 10px; font-weight: 600;
-      border: 1px solid rgba(16,185,129,0.25);
+      border: 1px solid rgba(13,150,104,0.3);
     }
     .grup-badge {
       display: inline-block; margin-left: 3px; padding: 2px 6px;
-      background: rgba(251,191,36,0.12); color: #fbbf24;
+      background: rgba(217,119,6,0.1); color: #92400e;
       border-radius: 20px; font-size: 9px; font-weight: 600;
-      border: 1px solid rgba(251,191,36,0.25);
+      border: 1px solid rgba(217,119,6,0.3);
     }
     .coklu-badge {
       display: inline-block; margin-left: 3px; padding: 2px 6px;
-      background: rgba(251,191,36,0.12); color: #fbbf24;
+      background: rgba(217,119,6,0.1); color: #92400e;
       border-radius: 20px; font-size: 9px; font-weight: 600;
-      border: 1px solid rgba(251,191,36,0.25);
+      border: 1px solid rgba(217,119,6,0.3);
     }
     .tekil-badge {
       display: inline-block; padding: 2px 7px;
-      background: rgba(90,133,112,0.15); color: var(--text3);
+      background: rgba(107,114,128,0.1); color: #374151;
       border-radius: 20px; font-size: 10px; font-weight: 600;
-      border: 1px solid rgba(90,133,112,0.25);
+      border: 1px solid rgba(107,114,128,0.25);
     }
     /* ── GRUP ÇERÇEVELEMESİ ── */
     tbody tr.grup-satir td {
@@ -2154,54 +2154,54 @@ async function bagisciListesiYazdir() {
       border-bottom: none;
     }
     tbody tr.grup-ilk td {
-      border-top: 2px solid rgba(251,191,36,0.5) !important;
+      border-top: 2px solid rgba(217,119,6,0.4) !important;
       padding-top: 8px;
     }
     tbody tr.grup-ilk td:first-child {
-      border-left: 3px solid #fbbf24;
+      border-left: 3px solid #d97706;
     }
     tbody tr.grup-son td {
-      border-bottom: 2px solid rgba(251,191,36,0.5) !important;
+      border-bottom: 2px solid rgba(217,119,6,0.4) !important;
       padding-bottom: 8px;
     }
     tbody tr.grup-satir td:first-child {
-      border-left: 3px solid rgba(251,191,36,0.4);
+      border-left: 3px solid rgba(217,119,6,0.35);
     }
-    tbody tr.grup-satir { border-bottom: 1px solid rgba(251,191,36,0.15); }
-    tbody tr.grup-son { border-bottom: 2px solid rgba(251,191,36,0.5) !important; margin-bottom: 4px; }
+    tbody tr.grup-satir { border-bottom: 1px solid rgba(217,119,6,0.15); }
+    tbody tr.grup-son { border-bottom: 2px solid rgba(217,119,6,0.4) !important; margin-bottom: 4px; }
     .etiket-chip {
       display: inline-block; padding: 1px 5px;
-      background: var(--bg4); color: var(--text2);
+      background: #f1f5f2; color: #374151;
       border-radius: 4px; font-size: 10px; margin: 1px;
-      border: 1px solid var(--border);
+      border: 1px solid #c8d8cc;
     }
     .video-badge {
       display: inline-block; padding: 3px 9px;
       border-radius: 20px; font-size: 10px; font-weight: 700;
     }
-    .video-badge.var { background: rgba(16,185,129,0.2); color: var(--accent); border: 1px solid rgba(16,185,129,0.4); }
-    .video-badge.yok { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+    .video-badge.var { background: rgba(13,150,104,0.12); color: #065f46; border: 1px solid rgba(13,150,104,0.35); }
+    .video-badge.yok { background: rgba(220,38,38,0.1); color: #991b1b; border: 1px solid rgba(220,38,38,0.3); }
     .video-sayi {
       display: inline-flex; align-items: center; justify-content: center;
       width: 22px; height: 22px;
-      background: var(--accent); color: #fff;
+      background: #0d9668; color: #fff;
       border-radius: 50%; font-size: 10px; font-weight: 700;
     }
-    .video-sayi.sifir { background: var(--bg5); color: var(--text3); }
+    .video-sayi.sifir { background: #e5e7eb; color: #6b7280; }
     /* SMS badge yazdırma */
     .sms-badge-print {
       display: inline-block; padding: 3px 9px;
       border-radius: 20px; font-size: 10px; font-weight: 700;
     }
     .sms-badge-print.sms-var {
-      background: rgba(16,185,129,0.25);
-      color: #34d399;
-      border: 1px solid rgba(16,185,129,0.5);
+      background: rgba(13,150,104,0.15);
+      color: #065f46;
+      border: 1px solid rgba(13,150,104,0.4);
     }
     .sms-badge-print.sms-yok {
-      background: rgba(251,191,36,0.12);
-      color: #fbbf24;
-      border: 1px solid rgba(251,191,36,0.3);
+      background: rgba(217,119,6,0.12);
+      color: #92400e;
+      border: 1px solid rgba(217,119,6,0.35);
     }
     .page-footer {
       margin-top: 14px; text-align: center;
@@ -2209,12 +2209,12 @@ async function bagisciListesiYazdir() {
       padding-top: 10px; border-top: 1px solid var(--border);
     }
     @media print {
-      body { background: #0a1410 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 0; }
+      body { background: #ffffff !important; color: #111827 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 0; }
       .tablo-wrap { box-shadow: none; }
       @page { margin: 8mm 10mm; size: A4 landscape; }
       thead { display: table-header-group; }
       tbody tr { page-break-inside: avoid; }
-      tbody tr.sms-ve-video-var td { background: rgba(16,185,129,0.18) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      tbody tr.sms-ve-video-var td { background: rgba(13,150,104,0.12) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
 </head>
@@ -2235,31 +2235,31 @@ async function bagisciListesiYazdir() {
   <div class="ozet">
     <div class="ozet-kart toplam">
       <div class="icon-box">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0d9668" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       </div>
       <div><div class="deger">${bagiscilar.length}</div><div class="etiket">Toplam</div></div>
     </div>
     <div class="ozet-kart var">
       <div class="icon-box">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0d9668" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
       </div>
       <div><div class="deger">${videoVar}</div><div class="etiket">Video Var</div></div>
     </div>
     <div class="ozet-kart yok">
       <div class="icon-box">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
       </div>
       <div><div class="deger">${videoYok}</div><div class="etiket">Video Yok</div></div>
     </div>
     <div class="ozet-kart sms-ok">
       <div class="icon-box">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><polyline points="9 11 12 14 15 11"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0d9668" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><polyline points="9 11 12 14 15 11"/></svg>
       </div>
       <div><div class="deger">${smsGonderildi}</div><div class="etiket">SMS Gönderildi</div></div>
     </div>
     <div class="ozet-kart sms-bek">
       <div class="icon-box">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       </div>
       <div><div class="deger">${smsBekliyor}</div><div class="etiket">SMS Bekliyor</div></div>
     </div>
