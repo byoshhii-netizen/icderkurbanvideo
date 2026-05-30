@@ -767,6 +767,10 @@ function _bagisciSatirHtml(b) {
         <button class="btn btn-primary btn-sm" onclick="bagisciVideoEkle(${b.id}, '${escHtml(b.ad)}')" title="Video Ekle">
           <i class="fas fa-plus"></i> Video
         </button>
+        ${b.video_var
+          ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="bagisciVideoDuzenle(${b.id})" title="Videoyu Düzenle" style="color:var(--accent);"><i class="fas fa-film"></i></button>`
+          : ''
+        }
         <button
           class="btn btn-sm sms-btn ${b.sms_gonderildi ? 'sms-gonderildi' : 'sms-bekliyor'}"
           id="sms-btn-${b.id}"
@@ -1241,6 +1245,7 @@ async function yinelenenlerYukle() {
       return (ad || '').toLowerCase()
         .replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s')
         .replace(/ı/g,'i').replace(/ö/g,'o').replace(/ç/g,'c')
+        .replace(/\s+/g,' ')  // çoklu boşlukları tek boşluğa indir
         .trim();
     }
     const isimGruplari = {};
@@ -1760,6 +1765,42 @@ async function videoKaydet() {
 function bagisciVideoEkle(bagisciId, bagisciAd) {
   sayfaGit('videolar');
   setTimeout(() => videoEkleModal(bagisciId, bagisciAd), 100);
+}
+
+async function bagisciVideoDuzenle(bagisciId) {
+  try {
+    const r = await fetch(`/api/admin/videolar?bagisci_id=${bagisciId}`);
+    const liste = await r.json();
+    if (!liste || liste.length === 0) { toast('Bu bağışçıya ait video bulunamadı', 'error'); return; }
+    if (liste.length === 1) {
+      videoDuzenle(liste[0].id);
+      return;
+    }
+    // Birden fazla video varsa seçtir
+    modalGoster(`
+      <div class="modal-header">
+        <div class="modal-title"><i class="fas fa-film" style="color:var(--accent)"></i> Hangi Videoyu Düzenleyelim?</div>
+        <button class="modal-close" onclick="modalKapat()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body" style="padding:20px;">
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          ${liste.map(v => `
+            <button class="btn btn-ghost" style="display:flex; align-items:center; gap:12px; text-align:left; padding:10px 14px;"
+              onclick="modalKapat(); setTimeout(()=>videoDuzenle(${v.id}), 100);">
+              ${v.thumbnail_url
+                ? `<img src="${escHtml(v.thumbnail_url)}" style="width:60px;height:38px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">`
+                : `<div style="width:60px;height:38px;background:var(--bg4);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-video" style="color:var(--text3)"></i></div>`
+              }
+              <div>
+                <div style="font-weight:600; font-size:0.9rem;">${escHtml(v.baslik || v.video_no + '. Video')}</div>
+                <div style="font-size:0.75rem; color:var(--text3);">${tarihFormat(v.olusturma)}</div>
+              </div>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `);
+  } catch (e) { toast('Bağlantı hatası', 'error'); }
 }
 
 function videoDuzenle(id) {
