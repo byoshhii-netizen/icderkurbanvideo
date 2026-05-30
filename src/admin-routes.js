@@ -157,7 +157,7 @@ router.get('/bagiscilar', adminKontrol, ac(async (req, res) => {
   `;
   const params = [];
   if (org_id)                  { sql += ' AND b.organizasyon_id=?'; params.push(org_id); }
-  if (q)                       { sql += ' AND (b.ad LIKE ? OR b.telefon LIKE ?)'; params.push(`%${q}%`, `%${q}%`); }
+  if (q)                       { sql += ' AND (LOWER(b.ad) LIKE LOWER(?) OR b.telefon LIKE ?)'; params.push(`%${q}%`, `%${q}%`); }
   if (video_durum === 'var')   { sql += ' AND b.video_var=1'; }
   if (video_durum === 'yok')   { sql += ' AND b.video_var=0'; }
   if (sort === 'yeni')         sql += ' ORDER BY b.olusturma DESC';
@@ -240,7 +240,7 @@ router.get('/videolar', adminKontrol, ac(async (req, res) => {
   const params = [];
   if (org_id)     { sql += ' AND v.organizasyon_id=?'; params.push(org_id); }
   if (bagisci_id) { sql += ' AND v.bagisci_id=?'; params.push(bagisci_id); }
-  if (q)          { sql += ' AND (b.ad LIKE ? OR v.baslik LIKE ? OR v.arama_etiketleri LIKE ?)'; params.push(`%${q}%`, `%${q}%`, `%${q}%`); }
+  if (q)          { sql += ' AND (LOWER(b.ad) LIKE LOWER(?) OR LOWER(v.baslik) LIKE LOWER(?) OR LOWER(v.arama_etiketleri) LIKE LOWER(?))'; params.push(`%${q}%`, `%${q}%`, `%${q}%`); }
   if (sort === 'eski') sql += ' ORDER BY v.olusturma ASC';
   else                 sql += ' ORDER BY v.olusturma DESC';
   const videolar = db.prepare(sql).all(...params);

@@ -1990,7 +1990,7 @@ async function izlemeLoglariniYukle() {
           ${l.video_baslik ? `<span style="color:var(--text3)"> — ${escHtml(l.video_baslik)}</span>` : ''}
           ${!l.bagisci_adi && !l.video_baslik ? '<span style="color:var(--text3)">-</span>' : ''}
         </td>
-        <td style="font-family:monospace; font-size:0.8rem; color:var(--text3);">${escHtml(l.ip_adresi || '-')}</td>
+        <td style="font-family:monospace; font-size:0.8rem; color:var(--text3);">${escHtml((l.ip_adresi || '-').replace(/^::ffff:/, ''))}</td>
         <td><span class="badge ${isIzleme ? 'badge-green' : 'badge-yellow'}">${isIzleme ? 'İzleme' : 'Arama'}</span></td>
       `;
       tbody.appendChild(tr);
@@ -2655,9 +2655,10 @@ function escHtml(str) {
 function tarihFormat(tarih) {
   if (!tarih) return '-';
   try {
-    const d = new Date(tarih);
-    return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
-      ' ' + d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    // SQLite CURRENT_TIMESTAMP UTC döner, +3 saat ekle (TR saati)
+    const d = new Date(tarih.includes('T') || tarih.includes('Z') ? tarih : tarih.replace(' ', 'T') + 'Z');
+    return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Istanbul' }) +
+      ' ' + d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' });
   } catch (e) { return tarih; }
 }
 
