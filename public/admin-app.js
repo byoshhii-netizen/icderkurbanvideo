@@ -28,7 +28,7 @@ async function adminDurumKontrol() {
 // ─── SAYFA NAVİGASYON ─────────────────────────────────────────────────────────
 function sayfaGit(sayfa) {
   aktifSayfa = sayfa;
-  const sayfalar = ['dashboard', 'organizasyonlar', 'bagiscilar', 'videolar', 'izleme', 'ayarlar'];
+  const sayfalar = ['dashboard', 'organizasyonlar', 'bagiscilar', 'videolar', 'izleme', 'yinelenenler', 'ayarlar'];
   sayfalar.forEach(s => {
     const el = document.getElementById('page-' + s);
     const nav = document.getElementById('nav-' + s);
@@ -42,6 +42,7 @@ function sayfaGit(sayfa) {
     bagiscilar: 'Bağışçılar',
     videolar: 'Kurban Videoları',
     izleme: 'İzleme Logları',
+    yinelenenler: 'Yinelenenler',
     ayarlar: 'Ayarlar'
   };
   document.getElementById('topbarTitle').textContent = basliklar[sayfa] || sayfa;
@@ -52,6 +53,7 @@ function sayfaGit(sayfa) {
   else if (sayfa === 'bagiscilar') bagiscilarYukle();
   else if (sayfa === 'videolar') videolarYukle();
   else if (sayfa === 'izleme') { izlemeOrgFilterDoldur(); izlemeLoglariniYukle(); }
+  else if (sayfa === 'yinelenenler') yinelenenlerYukle();
   else if (sayfa === 'ayarlar') { ayarlariYukle(); setTimeout(() => { topluVeAktarOrgDoldur(); icderOrglariYukle(); }, 200); }
 }
 
@@ -127,7 +129,7 @@ async function organizasyonlariYukle() {
     const r = await fetch('/api/admin/organizasyonlar');
     organizasyonlar = await r.json();
     // Filtreleri doldur
-    ['bagisciOrgFilter', 'videoOrgFilter'].forEach(id => {
+    ['bagisciOrgFilter', 'videoOrgFilter', 'yinelenenlerOrgFilter'].forEach(id => {
       const sel = document.getElementById(id);
       if (!sel) return;
       const mevcut = sel.value;
@@ -597,8 +599,9 @@ async function bagiscilarYukle() {
   const orgId = document.getElementById('bagisciOrgFilter')?.value || '';
   const videoDurum = document.getElementById('bagisciVideoDurum')?.value || '';
   const q = document.getElementById('bagisciArama')?.value?.trim() || '';
-  const grupTur = document.getElementById('bagisciGrupTur')?.value || ''; // 'tumu' | 'gruplu' | 'tekil'
+  const grupTur = document.getElementById('bagisciGrupTur')?.value || '';
   const smsDurum = document.getElementById('bagisciSmsDurum')?.value || '';
+  const sort = document.getElementById('bagisciSiralama')?.value || '';
   const tbody = document.getElementById('bagisciTableBody');
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px;"><div class="spinner" style="margin:auto;"></div></td></tr>';
@@ -607,6 +610,7 @@ async function bagiscilarYukle() {
     if (orgId) params.set('org_id', orgId);
     if (videoDurum) params.set('video_durum', videoDurum);
     if (q) params.set('q', q);
+    if (sort) params.set('sort', sort);
     const r = await fetch('/api/admin/bagiscilar?' + params.toString());
     let bagiscilar = await r.json();
     tbody.innerHTML = '';
@@ -1216,10 +1220,136 @@ async function smsDurumToggle(bagisciId, mevcutDurum) {
   }
 }
 
+// ─── YİNELENENLER ────────────────────────────────────────────────────────────
+async function yinelenenlerYukle() {
+  const container = document.getElementById('yinelenenlerIcerik');
+  if (!container) return;
+  container.innerHTML = '<div class="spinner" style="margin:40px auto;"></div>';
+
+  try {
+    const orgId = document.getElementById('yinelenenlerOrgFilter')?.value || '';
+    const params = new URLSearchParams();
+    if (orgId) params.set('org_id', orgId);
+    const r = await fetch('/api/admin/bagiscilar?' + params.toString());
+    const bagiscilar = await r.json();
+
+    // 1. Birden fazla videosu olanlar
+    const cokVideolu = bagiscilar.filter(b => (b.video_sayisi || 0) > 1);
+
+    // 2. Aynı isimde (normalize) birden fazla kayıt olanlar
+    function normAd(ad) {
+      return (ad || '').toLowerCase()
+        .replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s')
+        .replace(/ı/g,'i').replace(/ö/g,'o').replace(/ç/g,'c')
+        .trim();
+    }
+    const isimGruplari = {};
+    bagiscilar.forEach(b => {
+      const k = normAd(b.ad);
+      if (!k) return;
+      if (!isimGruplari[k]) isimGruplari[k] = [];
+      isimGruplari[k].push(b);
+    });
+    const ayniIsimler = Object.values(isimGruplari).filter(g => g.length > 1);
+
+    if (cokVideolu.length === 0 && ayniIsimler.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center; padding:60px 20px; color:var(--text3);">
+          <i class="fas fa-check-circle" style="font-size:2.5rem; color:var(--accent); margin-bottom:12px; display:block;"></i>
+          <div style="font-size:1rem; font-weight:600;">Yinelenen kayıt bulunamadı</div>
+          <div style="font-size:0.85rem; margin-top:6px;">Tüm bağışçılar temiz görünüyor.</div>
+        </div>`;
+      return;
+    }
+
+    let html = '';
+
+    // ── Birden fazla videosu olanlar ──
+    if (cokVideolu.length > 0) {
+      html += `
+        <div class="table-wrap" style="margin-bottom:24px;">
+          <div class="table-toolbar">
+            <span class="table-toolbar-title">
+              <i class="fas fa-copy" style="color:var(--yellow)"></i>
+              Birden Fazla Videosu Olan Bağışçılar
+              <span class="badge badge-gray" style="margin-left:8px;">${cokVideolu.length}</span>
+            </span>
+          </div>
+          <table>
+            <thead><tr>
+              <th>Ad Soyad</th><th>Telefon</th><th>Organizasyon</th><th>Video Sayısı</th><th>İşlem</th>
+            </tr></thead>
+            <tbody>
+              ${cokVideolu.map(b => `
+                <tr>
+                  <td style="font-weight:600; color:var(--text)">${escHtml(b.ad)}</td>
+                  <td style="font-family:monospace; font-size:0.85rem;">${escHtml(b.telefon || '—')}</td>
+                  <td style="font-size:0.8rem; color:var(--text3);">${escHtml(b.organizasyon_adi || '')}</td>
+                  <td><span style="background:var(--yellow); color:#000; border-radius:20px; padding:2px 10px; font-size:0.8rem; font-weight:700;">${b.video_sayisi} video</span></td>
+                  <td>
+                    <button class="btn btn-ghost btn-sm btn-icon" onclick="bagisciDuzenle(${b.id})" title="Düzenle"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-danger btn-sm btn-icon" onclick="bagisciSil(${b.id})" title="Sil"><i class="fas fa-trash"></i></button>
+                  </td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    // ── Aynı isimde birden fazla kayıt ──
+    if (ayniIsimler.length > 0) {
+      html += `
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <span class="table-toolbar-title">
+              <i class="fas fa-user-friends" style="color:var(--red)"></i>
+              Aynı İsimde Birden Fazla Kayıt
+              <span class="badge badge-gray" style="margin-left:8px;">${ayniIsimler.reduce((s,g)=>s+g.length,0)} kayıt / ${ayniIsimler.length} isim</span>
+            </span>
+          </div>
+          <table>
+            <thead><tr>
+              <th>Ad Soyad</th><th>Telefon</th><th>Organizasyon</th><th>Hisse</th><th>Video</th><th>İşlem</th>
+            </tr></thead>
+            <tbody>
+              ${ayniIsimler.map(grup => {
+                const renk = '#ef4444';
+                return grup.map((b, idx) => `
+                  <tr style="${idx === 0 ? 'border-top:2px solid ' + renk + '40;' : ''} border-left:3px solid ${renk}${idx === grup.length-1 ? '; border-bottom:2px solid ' + renk + '40' : ''};">
+                    <td style="font-weight:600; color:var(--text)">
+                      ${escHtml(b.ad)}
+                      ${idx === 0 ? `<span style="margin-left:6px; background:rgba(239,68,68,0.15); color:var(--red); border-radius:20px; padding:1px 7px; font-size:0.72rem; font-weight:700;">${grup.length}x</span>` : ''}
+                    </td>
+                    <td style="font-family:monospace; font-size:0.85rem;">${escHtml(b.telefon || '—')}</td>
+                    <td style="font-size:0.8rem; color:var(--text3);">${escHtml(b.organizasyon_adi || '')}</td>
+                    <td><span class="badge badge-gray" style="font-size:0.75rem;">${b.hisse_no || 1}. Hisse</span></td>
+                    <td>${b.video_var ? '<span style="color:var(--accent)">✓ Var</span>' : '<span style="color:var(--red)">✗ Yok</span>'}</td>
+                    <td>
+                      <button class="btn btn-ghost btn-sm btn-icon" onclick="bagisciDuzenle(${b.id})" title="Düzenle"><i class="fas fa-edit"></i></button>
+                      <button class="btn btn-danger btn-sm btn-icon" onclick="bagisciSil(${b.id})" title="Sil"><i class="fas fa-trash"></i></button>
+                    </td>
+                  </tr>`).join('');
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div style="color:var(--red); padding:20px;">Hata: ${e.message}</div>`;
+  }
+}
+
 // ─── İZLENME SIFIRLAMA MODAL YARDIMCISI ──────────────────────────────────────
+let _sifirlaCallbacks = { onTumu: null, onAralik: null };
+
 function _izlenmeSifirlaModal({ baslik, onTumu, onAralik }) {
+  _sifirlaCallbacks.onTumu = onTumu;
+  _sifirlaCallbacks.onAralik = onAralik;
+
   const simdi = new Date();
-  const bugun = simdi.toISOString().slice(0, 16); // datetime-local formatı
+  const bugun = simdi.toISOString().slice(0, 16);
   const birSaatOnce = new Date(simdi - 3600000).toISOString().slice(0, 16);
 
   modalGoster(`
@@ -1230,7 +1360,7 @@ function _izlenmeSifirlaModal({ baslik, onTumu, onAralik }) {
     <div class="modal-body" style="padding:20px;">
       <div style="display:flex; flex-direction:column; gap:12px;">
 
-        <button class="btn btn-danger" onclick="(${onTumu.toString()})(); modalKapat();">
+        <button class="btn btn-danger" onclick="_sifirlaCallbacks.onTumu(); modalKapat();">
           <i class="fas fa-trash-alt"></i> Tüm İzlenmeleri Sıfırla
         </button>
 
@@ -1253,7 +1383,7 @@ function _izlenmeSifirlaModal({ baslik, onTumu, onAralik }) {
             const e = document.getElementById('sifirlaBaslangicBitis')?.value;
             if (!b || !e) { toast('Tarih aralığı seçin', 'error'); return; }
             if (b >= e) { toast('Başlangıç bitiş tarihinden önce olmalı', 'error'); return; }
-            (${onAralik.toString()})(b + ':00', e + ':00'); modalKapat();
+            _sifirlaCallbacks.onAralik(b + ':00', e + ':00'); modalKapat();
           ">
             <i class="fas fa-filter"></i> Seçili Aralığı Sıfırla
           </button>
@@ -1322,6 +1452,7 @@ async function bagisciSil(id) {
 async function videolarYukle() {
   const orgId = document.getElementById('videoOrgFilter')?.value || '';
   const q = document.getElementById('videoArama')?.value?.trim() || '';
+  const sort = document.getElementById('videoSiralama')?.value || '';
   const tbody = document.getElementById('videoTableBody');
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;"><div class="spinner" style="margin:auto;"></div></td></tr>';
@@ -1329,6 +1460,7 @@ async function videolarYukle() {
     const params = new URLSearchParams();
     if (orgId) params.set('org_id', orgId);
     if (q) params.set('q', q);
+    if (sort) params.set('sort', sort);
     const r = await fetch('/api/admin/videolar?' + params.toString());
     const videolar = await r.json();
     tbody.innerHTML = '';
@@ -1955,6 +2087,45 @@ function _isimAramaUiGuncelle(aktif) {
   if (bilgi) {
     bilgi.style.display = aktif ? 'none' : 'block';
   }
+}
+
+async function ipIzlenmeSifirla() {
+  const ip = document.getElementById('sifirlaIpInput')?.value?.trim();
+  if (!ip) { toast('IP adresi girin', 'error'); return; }
+
+  _izlenmeSifirlaModal({
+    baslik: `IP Sıfırla: ${ip}`,
+    onTumu: async () => {
+      try {
+        const r = await fetch('/api/admin/izlenmeleri-sifirla-ip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip })
+        });
+        const d = await r.json();
+        if (d.ok) {
+          toast(`${d.silinen} kayıt silindi`, d.silinen > 0 ? 'success' : 'info');
+          const sonuc = document.getElementById('sifirlaIpSonuc');
+          if (sonuc) sonuc.textContent = `${d.silinen} kayıt silindi`;
+        } else toast(d.hata || 'Hata', 'error');
+      } catch (e) { toast('Bağlantı hatası', 'error'); }
+    },
+    onAralik: async (baslangic, bitis) => {
+      try {
+        const r = await fetch('/api/admin/izlenmeleri-sifirla-ip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip, baslangic, bitis })
+        });
+        const d = await r.json();
+        if (d.ok) {
+          toast(`${d.silinen} kayıt silindi`, d.silinen > 0 ? 'success' : 'info');
+          const sonuc = document.getElementById('sifirlaIpSonuc');
+          if (sonuc) sonuc.textContent = `${d.silinen} kayıt silindi`;
+        } else toast(d.hata || 'Hata', 'error');
+      } catch (e) { toast('Bağlantı hatası', 'error'); }
+    }
+  });
 }
 
 async function istisnaIpKaydet() {

@@ -145,7 +145,7 @@ function normalizeTelefon(telefon) {
 }
 
 router.get('/bagiscilar', adminKontrol, ac(async (req, res) => {
-  const { org_id, q, video_durum } = req.query;
+  const { org_id, q, video_durum, sort } = req.query;
   const db = await getDb();
   let sql = `
     SELECT b.*, o.ad as organizasyon_adi,
@@ -160,7 +160,9 @@ router.get('/bagiscilar', adminKontrol, ac(async (req, res) => {
   if (q)                       { sql += ' AND (b.ad LIKE ? OR b.telefon LIKE ?)'; params.push(`%${q}%`, `%${q}%`); }
   if (video_durum === 'var')   { sql += ' AND b.video_var=1'; }
   if (video_durum === 'yok')   { sql += ' AND b.video_var=0'; }
-  sql += ' ORDER BY b.ad ASC';
+  if (sort === 'yeni')         sql += ' ORDER BY b.olusturma DESC';
+  else if (sort === 'eski')    sql += ' ORDER BY b.olusturma ASC';
+  else                         sql += ' ORDER BY b.ad ASC';
   res.json(db.prepare(sql).all(...params));
 }));
 
@@ -225,7 +227,7 @@ router.post('/bagiscilar/toplu-ekle', adminKontrol, ac(async (req, res) => {
 
 // ─── VİDEOLAR ─────────────────────────────────────────────────────────────────
 router.get('/videolar', adminKontrol, ac(async (req, res) => {
-  const { org_id, bagisci_id, q } = req.query;
+  const { org_id, bagisci_id, q, sort } = req.query;
   const db = await getDb();
   let sql = `
     SELECT v.*, b.ad as bagisci_adi, b.telefon as bagisci_telefon, b.hisse_no, b.grup_id,
@@ -239,7 +241,8 @@ router.get('/videolar', adminKontrol, ac(async (req, res) => {
   if (org_id)     { sql += ' AND v.organizasyon_id=?'; params.push(org_id); }
   if (bagisci_id) { sql += ' AND v.bagisci_id=?'; params.push(bagisci_id); }
   if (q)          { sql += ' AND (b.ad LIKE ? OR v.baslik LIKE ? OR v.arama_etiketleri LIKE ?)'; params.push(`%${q}%`, `%${q}%`, `%${q}%`); }
-  sql += ' ORDER BY v.olusturma DESC';
+  if (sort === 'eski') sql += ' ORDER BY v.olusturma ASC';
+  else                 sql += ' ORDER BY v.olusturma DESC';
   const videolar = db.prepare(sql).all(...params);
 
   // Her video için grup üyelerini ekle
@@ -511,6 +514,24 @@ router.post('/bagiscilar/:id/izlenmeleri-sifirla', adminKontrol, ac(async (req, 
   } else {
     sayac = db.prepare('SELECT COUNT(*) as c FROM izleme_loglari WHERE bagisci_id=?').get(req.params.id);
     db.prepare('DELETE FROM izleme_loglari WHERE bagisci_id=?').run(req.params.id);
+  }
+  res.json({ ok: true, silinen: sayac?.c || 0 });
+}));
+
+// ─── IP'YE GÖRE İZLENMELERİ SIFIRLA ─────────────────────────────────────────
+router.post('/izlenmeleri-sifirla-ip', adminKontrol, ac(async (req, res) => {
+  const { ip, baslangic, bitis } = req.body || {};
+  if (!ip) return res.status(400).json({ hata: 'ip gerekli' });
+  const db = await getDb();
+  const temizIp = ip.trim();
+  const mappedIp = '::ffff:' + temizIp;
+  let sayac;
+  if (baslangic && bitis) {
+    sayac = db.prepare('SELECT COUNT(*) as c FROM izleme_loglari WHERE (ip_adresi=? OR ip_adresi=?) AND tarih >= ? AND tarih <= ?').get(temizIp, mappedIp, baslangic, bitis);
+    db.prepare('DELETE FROM izleme_loglari WHERE (ip_adresi=? OR ip_adresi=?) AND tarih >= ? AND tarih <= ?').run(temizIp, mappedIp, baslangic, bitis);
+  } else {
+    sayac = db.prepare('SELECT COUNT(*) as c FROM izleme_loglari WHERE ip_adresi=? OR ip_adresi=?').get(temizIp, mappedIp);
+    db.prepare('DELETE FROM izleme_loglari WHERE ip_adresi=? OR ip_adresi=?').run(temizIp, mappedIp);
   }
   res.json({ ok: true, silinen: sayac?.c || 0 });
 }));
